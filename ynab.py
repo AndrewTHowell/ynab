@@ -7,6 +7,7 @@ import urllib.parse
 import requests
 from typing import Any, Dict, List
 import locale
+import re
 from prettytable import PrettyTable
 
 logging.basicConfig(format="%(levelname)s: %(message)s")
@@ -161,6 +162,12 @@ class Account:
         self.name = account_json["name"]
         self.balance = Decimal(account_json["balance"]) / Decimal(1000)
         self.closed = account_json["closed"]
+        
+        try:
+            match = re.search(r"\b\w+ Term", account_json["note"])
+            self.term = match.groups()
+        except:
+            log.warning(f"Account '{self.name}' does not include a term")
         
     def __str__(self):
         return self.name
