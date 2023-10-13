@@ -46,6 +46,7 @@ def main():
     auth_token = config["auth_token"]
     auth = BearerAuth(auth_token)
     budget_name =config["budget_name"]
+    fund_distribution =config["fund_distribution"]
     
     
     budget = get_budget_by_name(base_url=base_url, auth=auth, name=budget_name)
@@ -54,11 +55,36 @@ def main():
     
     open_accounts = [ account for account in accounts if not account.closed ]
     
-    net_worth = 0
-    for account in open_accounts:
-        net_worth += account.balance
+    accounts_by_term = fund_distribution["accounts_by_term"]
+    terms = list(accounts_by_term.keys())
+    term_totals = {term: Decimal(0) for term in terms}
+    for open_account in open_accounts:
+        for term in terms:
+            if open_account.name in accounts_by_term[term]:
+                term_totals[term] += open_account.balance
     
-    print(f"Net Worth: {locale.currency(net_worth, grouping=True)}")
+    total = 0
+    for term_total in term_totals.values():
+        total += term_total
+        
+    print(f"Net Worth: {locale.currency(total, grouping=True)}")
+    
+    target_term_distribution = fund_distribution["target_term_distribution"]
+    real_term_distribution = {
+        term: float(term_total)/float(total)
+        for term, term_total in term_totals.items()
+    }
+    
+    term_distribution_diff = {
+        term: f"{real_term_distribution[term] - target_term_distribution[term]:.2f}" # Needs division by 100 to make %
+        for term in terms
+    }
+    
+    print(term_totals)
+    print(target_term_distribution)
+    print(real_term_distribution)
+    print(term_distribution_diff)
+        
 
 _budgets_url = "budgets"
 
