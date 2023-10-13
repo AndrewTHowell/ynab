@@ -6,6 +6,7 @@ import urllib.parse
 import requests
 from typing import Any, Dict, List
 import locale
+from prettytable import PrettyTable
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 
@@ -63,27 +64,54 @@ def main():
             if open_account.name in accounts_by_term[term]:
                 term_totals[term] += open_account.balance
     
-    total = 0
+    total = Decimal(0)
     for term_total in term_totals.values():
         total += term_total
         
-    print(f"Net Worth: {locale.currency(total, grouping=True)}")
+    net_worth = PrettyTable(["Net Worth"])
+    net_worth.add_row([total])
+    print(net_worth)
     
     target_term_distribution = fund_distribution["target_term_distribution"]
-    real_term_distribution = {
-        term: float(term_total)/float(total)
-        for term, term_total in term_totals.items()
+    
+    target_term_totals = {
+        term: Decimal(term_proportion)*total
+        for term, term_proportion in target_term_distribution.items()
     }
     
-    term_distribution_diff = {
-        term: f"{real_term_distribution[term] - target_term_distribution[term]:.2f}" # Needs division by 100 to make %
-        for term in terms
+    term_total_diff = {
+        term: {
+            "diff": term_totals[term] - target_term_totals[term],
+            "target": target_term_totals[term],
+            "actual": term_totals[term]
+        }
+        for term in terms if term_totals[term] - target_term_totals[term] != 0
     }
     
-    print(term_totals)
-    print(target_term_distribution)
-    print(real_term_distribution)
-    print(term_distribution_diff)
+    checksum = 0
+    for term_total in term_total_diff.values():
+        checksum += term_total["diff"]
+    assert checksum == 0
+    
+    breakdown_by_terms = PrettyTable(["Term", "Target Total", "Actual Total", "Action"])
+    for term, term_total in term_total_diff.items():
+        diff = term_total["diff"] 
+        target_total = term_total["target"]
+        actual_total = term_total["actual"]
+        
+        operand = "more"
+        if diff > 0:
+            operand = "less"
+        diff = abs(diff)
+        
+        breakdown_by_terms.add_row([
+            term.capitalize(),
+            locale.currency(target_total, grouping=True),
+            locale.currency(actual_total, grouping=True),
+            f"Needs {locale.currency(diff, grouping=True)} {operand}"
+        ])
+        
+    print(breakdown_by_terms)
         
 
 _budgets_url = "budgets"
