@@ -7,7 +7,6 @@ import urllib.parse
 import requests
 from typing import Any, Dict, List
 import locale
-import re
 from prettytable import PrettyTable
 
 logging.basicConfig(format="%(levelname)s: %(message)s")
@@ -61,8 +60,8 @@ def main():
 
     auth_token = config["auth_token"]
     auth = BearerAuth(auth_token)
-    budget_name =config["budget_name"]
-    fund_distribution =config["fund_distribution"]
+    budget_name = config["budget_name"]
+    target_term_distribution = config["target_term_distribution"]
     
     
     budget = get_budget_by_name(base_url=base_url, auth=auth, name=budget_name)
@@ -71,23 +70,18 @@ def main():
     
     open_accounts = [ account for account in accounts if not account.closed ]
     
-    accounts_by_term = fund_distribution["accounts_by_term"]
-    terms = list(accounts_by_term.keys())
+    terms = list(target_term_distribution.keys())
     term_totals = {term: Decimal(0) for term in terms}
     for open_account in open_accounts:
-        for term in terms:
-            if open_account.name in accounts_by_term[term]:
-                term_totals[term] += open_account.balance
+        term_totals[open_account.term] += open_account.balance
     
     total = Decimal(0)
     for term_total in term_totals.values():
         total += term_total
         
     net_worth = PrettyTable(["Net Worth"])
-    net_worth.add_row([total])
+    net_worth.add_row([locale.currency(total, grouping=True),])
     print(net_worth)
-    
-    target_term_distribution = fund_distribution["target_term_distribution"]
     
     target_term_totals = {
         term: Decimal(term_proportion)*total
@@ -118,12 +112,13 @@ def main():
         if diff > 0:
             operand = "less"
         diff = abs(diff)
+        diff = round(diff, -2) # Round to nearest 100
         
         breakdown_by_terms.add_row([
             term.capitalize(),
             locale.currency(target_total, grouping=True),
             locale.currency(actual_total, grouping=True),
-            f"Needs {locale.currency(diff, grouping=True)} {operand}"
+            f"Needs ~{locale.currency(diff, grouping=True)} {operand}"
         ])
         
     print(breakdown_by_terms)
@@ -158,17 +153,14 @@ _accounts_url = "budgets/{}/accounts"
 
 class Account:
     def __init__(self, account_json: Dict):
+        log.debug(f"account_json: {account_json}")
+        
         self.id = account_json["id"]
         self.name = account_json["name"]
         self.balance = Decimal(account_json["balance"]) / Decimal(1000)
         self.closed = account_json["closed"]
-        
-        try:
-            match = re.search(r"\b\w+ Term", account_json["note"])
-            self.term = match.groups()
-        except:
-            log.warning(f"Account '{self.name}' does not include a term")
-        
+        self.term = account_json["note"].split()[0].lower()
+
     def __str__(self):
         return self.name
     
