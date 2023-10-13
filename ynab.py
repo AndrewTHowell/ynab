@@ -1,6 +1,7 @@
 import argparse
 from decimal import Decimal
 import json
+import logging
 import os
 import urllib.parse
 import requests
@@ -8,7 +9,11 @@ from typing import Any, Dict, List
 import locale
 from prettytable import PrettyTable
 
+logging.basicConfig(format="%(levelname)s: %(message)s")
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 base_url = "https://api.ynab.com/v1/"
 
@@ -37,7 +42,16 @@ def main():
         required=True,
         dest="config_file_path",
     )
+    parser.add_argument(
+        "-d", "--debug",
+        help="Turn on debug logging.",
+        action='store_true',
+        dest="debug"
+    )
     args = parser.parse_args()
+    
+    if args.debug:
+        log.setLevel(logging.DEBUG)
     
     config_file_path = args.config_file_path
     
