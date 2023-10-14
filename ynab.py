@@ -72,16 +72,26 @@ def main():
     
     terms = list(target_term_distribution.keys())
     term_totals = {term: Decimal(0) for term in terms}
+    account_names_by_term = {term: [] for term in terms}
     for open_account in open_accounts:
         term_totals[open_account.term] += open_account.balance
+        account_names_by_term[open_account.term].append(open_account.name)
     
     total = Decimal(0)
     for term_total in term_totals.values():
         total += term_total
         
     net_worth = PrettyTable(["Net Worth"])
-    net_worth.add_row([locale.currency(total, grouping=True),])
+    net_worth.add_row([locale.currency(total, grouping=True)])
     print(net_worth)
+        
+    accounts_by_term = PrettyTable()
+    for term in terms:
+        accounts_by_term.add_column(
+            f"{term.capitalize()} Term",
+            [", ".join(account_names_by_term[term])]
+        )
+    print(accounts_by_term)
     
     target_term_totals = {
         term: Decimal(term_proportion)*total
