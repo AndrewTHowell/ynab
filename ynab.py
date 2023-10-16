@@ -93,12 +93,12 @@ def main():
         term_totals[open_account.term] += open_account.balance
         account_names_by_term[open_account.term].append(open_account.name)
     
-    total = Decimal(0)
+    category_total = Decimal(0)
     for term_total in term_totals.values():
-        total += term_total
+        category_total += term_total
         
     net_worth = PrettyTable(["Net Worth"])
-    net_worth.add_row([locale.currency(total, grouping=True)])
+    net_worth.add_row([locale.currency(category_total, grouping=True)])
     print(net_worth)
         
     categories = get_categories(base_url=_base_url, auth=auth, budget_id=budget["id"])
@@ -112,7 +112,7 @@ def main():
     active_categories.sort(key = lambda x: (x.balance))
     active_categories.sort(key = lambda x: (x.term), reverse=True)
     
-    total = Decimal(0)
+    category_total = Decimal(0)
     categories_table = PrettyTable(["Name", "Balance", "Term"])
     for category in active_categories:
         categories_table.add_row([
@@ -120,9 +120,9 @@ def main():
             locale.currency(category.balance, grouping=True),
             category.term,
         ])
-        total += category.balance
+        category_total += category.balance
     print(categories_table)
-    print(f"total: {total}")
+    print(f"category_total: {category_total}")
     
     categories_by_term = {}
     for category in active_categories:
@@ -137,12 +137,21 @@ def main():
             
     # Manually fake a category for student loan
     ## It means we don't have to ignore it from balances and final net worth
-        
-    accounts_by_term = PrettyTable()
-    for term in _terms:
-        accounts_by_term.add_column(f"{term.capitalize()} Term",[", ".join(account_names_by_term[term])])
-        
-    print(accounts_by_term)
+    
+    account_total = Decimal(0)
+    accounts_table = PrettyTable(["Name", "Balance", "Term"])
+    for account in open_accounts:
+        accounts_table.add_row([
+            account.name,
+            locale.currency(account.balance, grouping=True),
+            account.term,
+        ])
+        account_total += account.balance
+    print(accounts_table)
+    print(f"account_total: {account_total}")
+    
+    checksum = account_total - category_total
+    assert checksum == 0
     
     term_total_diff = {
         term: {
@@ -152,11 +161,6 @@ def main():
         }
         for term in _terms# if term_totals[term] - target_term_totals[term] != 0
     }
-    
-    checksum = 0
-    for term_total in term_total_diff.values():
-        checksum += term_total["diff"]
-    assert checksum == 0
     
     breakdown_by_terms = PrettyTable(["Term", "Target Total", "Actual Total", "Action"])
     for term, term_total in term_total_diff.items():
