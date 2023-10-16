@@ -276,7 +276,7 @@ class Category:
         log.debug(f"category_json: {category_json}")
         
         self.id = category_json["id"]
-        self.name = category_json["name"]
+        self.name = re.sub(r'[^\w :()]', '', category_json["name"]).lstrip(" ")
         self.balance = Decimal(category_json["balance"]) / Decimal(1000)
         self.hidden = category_json["hidden"]
         self.deleted = category_json["deleted"]
@@ -318,7 +318,7 @@ class Category:
                 self.term = "short"
                 return
             
-        if self.name == "💳 Amex Membership":
+        if self.name == "Amex Membership":
             self.term = "medium"
             
         self.term = "long"
