@@ -68,10 +68,24 @@ def main():
     
     budget = get_budget_by_name(base_url=base_url, auth=auth, name=budget_name)
     
-    print(get_categories(base_url=base_url, auth=auth, budget_id=budget["id"]))
+    categories = get_categories(base_url=base_url, auth=auth, budget_id=budget["id"])
     
-    return 
+    active_categories = [ category for category in categories if not category.hidden and not category.deleted ]
     
+    categories_by_term = {}
+    for category in active_categories:
+        if category.term not in categories_by_term:
+            categories_by_term[category.term] = []
+        categories_by_term[category.term].append(category)
+        
+    term_balances = { term: Decimal(0) for term in categories_by_term.keys() }
+    for term, categories in categories_by_term.items():
+        for category in categories:
+            term_balances[term] += category.balance
+            
+    # Manually fake a category for student loan
+    # Means we don't have to ignore it from balances and final net worth
+            
     accounts = get_accounts(base_url=base_url, auth=auth, budget_id=budget["id"])
     
     open_accounts = [ account for account in accounts if not account.closed ]
@@ -187,6 +201,7 @@ class Account:
         
         self.id = account_json["id"]
         self.name = account_json["name"]
+        self.type = account_json["type"]
         self.balance = Decimal(account_json["balance"]) / Decimal(1000)
         self.term = get_term(account_json["note"])
         self.closed = account_json["closed"]
