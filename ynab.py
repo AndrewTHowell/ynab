@@ -59,12 +59,20 @@ def main():
         config = json.load(f)
 
     auth_token = config["auth_token"]
+    log.debug(f"auth_token: {auth_token}")
     auth = BearerAuth(auth_token)
-    budget_name = config["budget_name"]
+    
+    budget_name = ""
+    if "budget_name" in config:
+        budget_name = config["budget_name"]
+    log.debug(f"budget_name: {budget_name}")
+    
     target_term_distribution = config["target_term_distribution"]
     
-    
-    budget = get_budget_by_name(base_url=base_url, auth=auth, name=budget_name)
+    if budget_name:
+        budget = get_budget_by_name(base_url=base_url, auth=auth, name=budget_name)
+    else:
+        budget = get_last_used_budget(base_url=base_url, auth=auth)
     
     accounts = get_accounts(base_url=base_url, auth=auth, budget_id=budget["id"])
     
@@ -158,6 +166,22 @@ def get_budget_by_name(base_url: str, auth: Any, name: str) -> Dict[str, Any]:
             return budget
     
     return None # type: ignore
+
+_budget_url = "budgets/{}"
+
+def get_last_used_budget(base_url: str, auth: Any) -> Dict[str, Any]:
+    resp_dict = {}
+    try:
+        resp = requests.get(urllib.parse.urljoin(base_url, _budget_url.format("last-used")), auth=auth)
+        resp.raise_for_status()
+        resp_dict = resp.json()
+
+    except requests.exceptions.HTTPError as e:
+        print("Bad HTTP status code:", e)
+    except requests.exceptions.RequestException as e:
+        print("Network error:", e)
+
+    return resp_dict["data"]["budget"]
 
 _accounts_url = "budgets/{}/accounts"
 
