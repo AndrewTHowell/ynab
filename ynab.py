@@ -84,7 +84,7 @@ def main():
             term_balances[term] += category.balance
             
     # Manually fake a category for student loan
-    # Means we don't have to ignore it from balances and final net worth
+    ## It means we don't have to ignore it from balances and final net worth
             
     accounts = get_accounts(base_url=base_url, auth=auth, budget_id=budget["id"])
     
