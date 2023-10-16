@@ -82,6 +82,24 @@ def main():
         budget = get_budget_by_name(base_url=_base_url, auth=auth, name=budget_name)
     else:
         budget = get_last_used_budget(base_url=_base_url, auth=auth)
+            
+    accounts = get_accounts(base_url=_base_url, auth=auth, budget_id=budget["id"])
+    
+    open_accounts = [ account for account in accounts if not account.closed ]
+    
+    term_totals = {term: Decimal(0) for term in _terms}
+    account_names_by_term = {term: [] for term in _terms}
+    for open_account in open_accounts:
+        term_totals[open_account.term] += open_account.balance
+        account_names_by_term[open_account.term].append(open_account.name)
+    
+    total = Decimal(0)
+    for term_total in term_totals.values():
+        total += term_total
+        
+    net_worth = PrettyTable(["Net Worth"])
+    net_worth.add_row([locale.currency(total, grouping=True)])
+    print(net_worth)
         
     categories = get_categories(base_url=_base_url, auth=auth, budget_id=budget["id"])
     
@@ -119,24 +137,6 @@ def main():
             
     # Manually fake a category for student loan
     ## It means we don't have to ignore it from balances and final net worth
-            
-    accounts = get_accounts(base_url=_base_url, auth=auth, budget_id=budget["id"])
-    
-    open_accounts = [ account for account in accounts if not account.closed ]
-    
-    term_totals = {term: Decimal(0) for term in _terms}
-    account_names_by_term = {term: [] for term in _terms}
-    for open_account in open_accounts:
-        term_totals[open_account.term] += open_account.balance
-        account_names_by_term[open_account.term].append(open_account.name)
-    
-    total = Decimal(0)
-    for term_total in term_totals.values():
-        total += term_total
-        
-    net_worth = PrettyTable(["Net Worth"])
-    net_worth.add_row([locale.currency(total, grouping=True)])
-    print(net_worth)
         
     accounts_by_term = PrettyTable()
     for term in _terms:
