@@ -3,8 +3,10 @@ from decimal import Decimal
 import json
 import logging
 import os
+from unicodedata import category
 import urllib.parse
 import requests
+import re
 from typing import Any, Dict, List
 import locale
 from prettytable import PrettyTable
@@ -65,6 +67,10 @@ def main():
     
     
     budget = get_budget_by_name(base_url=base_url, auth=auth, name=budget_name)
+    
+    print(get_categories(base_url=base_url, auth=auth, budget_id=budget["id"]))
+    
+    return 
     
     accounts = get_accounts(base_url=base_url, auth=auth, budget_id=budget["id"])
     
@@ -159,6 +165,20 @@ def get_budget_by_name(base_url: str, auth: Any, name: str) -> Dict[str, Any]:
     
     return None # type: ignore
 
+_term_pattern = r'\w+ Term'
+
+def get_term(note: str):
+    log.debug(f"note: {note}")
+    if not note:
+        return ""
+    
+    match = re.search(_term_pattern, note)
+    if not match:
+        return ""
+    
+    term = match.group(0)
+    return term.split()[0].lower()
+
 _accounts_url = "budgets/{}/accounts"
 
 class Account:
@@ -168,8 +188,8 @@ class Account:
         self.id = account_json["id"]
         self.name = account_json["name"]
         self.balance = Decimal(account_json["balance"]) / Decimal(1000)
+        self.term = get_term(account_json["note"])
         self.closed = account_json["closed"]
-        self.term = account_json["note"].split()[0].lower()
 
     def __str__(self):
         return self.name
@@ -191,6 +211,46 @@ def get_accounts(base_url: str, auth: Any, budget_id: str) -> List[Account]:
         print("Network error:", e)
 
     return [ Account(account_json) for account_json in resp_dict["data"]["accounts"]] 
+
+_categories_url = "budgets/{}/categories"
+
+class Category:
+    def __init__(self, category_json: Dict):
+        log.debug(f"category_json: {category_json}")
+        
+        self.id = category_json["id"]
+        self.name = category_json["name"]
+        self.balance = Decimal(category_json["balance"]) / Decimal(1000)
+        self.term = get_term(category_json["note"])
+        self.hidden = category_json["hidden"]
+        self.deleted = category_json["deleted"]
+
+    def __str__(self):
+        return self.name
+    
+    def __repr__(self):
+        return self.__str__()
+
+    
+def get_categories(base_url: str, auth: Any, budget_id: str) -> List[Category]:
+    resp_dict = {}
+    try:
+        resp = requests.get(urllib.parse.urljoin(base_url, _categories_url.format(budget_id)), auth=auth)
+        resp.raise_for_status()
+        resp_dict = resp.json()
+
+    except requests.exceptions.HTTPError as e:
+        print("Bad HTTP status code:", e)
+    except requests.exceptions.RequestException as e:
+        print("Network error:", e)
+        
+    log.debug(f"list categories json: {resp_dict}")
+
+    return [
+        Category(category_json)
+        for category_group in resp_dict["data"]["category_groups"]
+        for category_json in category_group["categories"]
+    ] 
     
 
 if __name__ == "__main__":
