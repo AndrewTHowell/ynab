@@ -85,7 +85,11 @@ def main():
             
     accounts = get_accounts(base_url=_base_url, auth=auth, budget_id=budget["id"])
     
-    open_accounts = [ account for account in accounts if not account.closed ]
+    open_accounts = [
+        account for account in accounts
+        #if not account.closed and account.name not in ["Pension", "Student Loan"]
+        if account.name not in ["Pension", "Student Loan"]
+    ]
     
     term_totals = {term: Decimal(0) for term in _terms}
     account_names_by_term = {term: [] for term in _terms}
@@ -105,7 +109,8 @@ def main():
     
     active_categories = [
         category for category in categories
-        if not category.hidden and not category.deleted and not category.name == "Inflow: Ready to Assign"
+        #if not category.hidden and not category.deleted and
+        if not category.name == "Inflow: Ready to Assign"
     ]
     
     active_categories.sort(key = lambda x: (x.name))
@@ -151,6 +156,7 @@ def main():
     print(f"account_total: {account_total}")
     
     checksum = account_total - category_total
+    print(f"checksum: {checksum}")
     assert checksum == 0
     
     term_total_diff = {
@@ -282,6 +288,7 @@ class Category:
         self.id = category_json["id"]
         self.name = re.sub(r'[^\w :()]', '', category_json["name"]).lstrip(" ")
         self.balance = Decimal(category_json["balance"]) / Decimal(1000)
+        self.category_group_name = category_json["category_group_name"]
         self.hidden = category_json["hidden"]
         self.deleted = category_json["deleted"]
         
@@ -294,7 +301,6 @@ class Category:
         if goal_target_month_str:
             goal_target_month = datetime.strptime(goal_target_month_str, "%Y-%m-%d").date()
         goal_months_to_budget = category_json["goal_months_to_budget"]
-        category_group_name = category_json["category_group_name"]
         
         if goal_type:
             if goal_type == "TB" or goal_type == "MF":
@@ -317,8 +323,8 @@ class Category:
                 self.term = "medium"
                 return
             
-        if category_group_name:
-            if category_group_name == "Credit Card Payments":
+        if self.category_group_name:
+            if self.category_group_name == "Credit Card Payments":
                 self.term = "short"
                 return
             
