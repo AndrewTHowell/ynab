@@ -3,13 +3,13 @@ from decimal import Decimal
 import json
 import logging
 import os
-from unicodedata import category
 import urllib.parse
 import requests
 import re
 from typing import Any, Dict, List
 import locale
 from prettytable import PrettyTable
+from datetime import datetime, timedelta
 
 logging.basicConfig(format="%(levelname)s: %(message)s")
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
@@ -17,7 +17,16 @@ locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-base_url = "https://api.ynab.com/v1/"
+_base_url = "https://api.ynab.com/v1/"
+
+""" 
+_terms defines what terms accounts/categories can be classed as.
+
+Short: 0-3 months
+Medium: 3 months - 5 years
+Long: 5+ years
+"""
+_terms = ["short", "medium", "long"]
 
 class BearerAuth(requests.auth.AuthBase): # type: ignore
     def __init__(self, token):
@@ -63,14 +72,32 @@ def main():
     auth_token = config["auth_token"]
     auth = BearerAuth(auth_token)
     budget_name = config["budget_name"]
-    target_term_distribution = config["target_term_distribution"]
     
     
-    budget = get_budget_by_name(base_url=base_url, auth=auth, name=budget_name)
+    budget = get_budget_by_name(base_url=_base_url, auth=auth, name=budget_name)
     
-    categories = get_categories(base_url=base_url, auth=auth, budget_id=budget["id"])
+    categories = get_categories(base_url=_base_url, auth=auth, budget_id=budget["id"])
     
-    active_categories = [ category for category in categories if not category.hidden and not category.deleted ]
+    active_categories = [
+        category for category in categories
+        if not category.hidden and not category.deleted and not category.name == "Inflow: Ready to Assign"
+    ]
+    
+    active_categories.sort(key = lambda x: (x.name))
+    active_categories.sort(key = lambda x: (x.balance))
+    active_categories.sort(key = lambda x: (x.term), reverse=True)
+    
+    total = Decimal(0)
+    categories_table = PrettyTable(["Name", "Balance", "Term"])
+    for category in active_categories:
+        categories_table.add_row([
+            category.name,
+            locale.currency(category.balance, grouping=True),
+            category.term,
+        ])
+        total += category.balance
+    print(categories_table)
+    print(f"total: {total}")
     
     categories_by_term = {}
     for category in active_categories:
@@ -86,13 +113,12 @@ def main():
     # Manually fake a category for student loan
     ## It means we don't have to ignore it from balances and final net worth
             
-    accounts = get_accounts(base_url=base_url, auth=auth, budget_id=budget["id"])
+    accounts = get_accounts(base_url=_base_url, auth=auth, budget_id=budget["id"])
     
     open_accounts = [ account for account in accounts if not account.closed ]
     
-    terms = list(target_term_distribution.keys())
-    term_totals = {term: Decimal(0) for term in terms}
-    account_names_by_term = {term: [] for term in terms}
+    term_totals = {term: Decimal(0) for term in _terms}
+    account_names_by_term = {term: [] for term in _terms}
     for open_account in open_accounts:
         term_totals[open_account.term] += open_account.balance
         account_names_by_term[open_account.term].append(open_account.name)
@@ -106,25 +132,18 @@ def main():
     print(net_worth)
         
     accounts_by_term = PrettyTable()
-    for term in terms:
-        accounts_by_term.add_column(
-            f"{term.capitalize()} Term",
-            [", ".join(account_names_by_term[term])]
-        )
+    for term in _terms:
+        accounts_by_term.add_column(f"{term.capitalize()} Term",[", ".join(account_names_by_term[term])])
+        
     print(accounts_by_term)
-    
-    target_term_totals = {
-        term: Decimal(term_proportion)*total
-        for term, term_proportion in target_term_distribution.items()
-    }
     
     term_total_diff = {
         term: {
-            "diff": term_totals[term] - target_term_totals[term],
-            "target": target_term_totals[term],
+            "diff": term_totals[term],# - target_term_totals[term],
+            #"target": target_term_totals[term],
             "actual": term_totals[term]
         }
-        for term in terms if term_totals[term] - target_term_totals[term] != 0
+        for term in _terms# if term_totals[term] - target_term_totals[term] != 0
     }
     
     checksum = 0
@@ -236,9 +255,50 @@ class Category:
         self.id = category_json["id"]
         self.name = category_json["name"]
         self.balance = Decimal(category_json["balance"]) / Decimal(1000)
-        self.term = get_term(category_json["note"])
         self.hidden = category_json["hidden"]
         self.deleted = category_json["deleted"]
+        
+        self.__set_term(category_json=category_json)
+        
+    def __set_term(self, category_json: Dict):
+        goal_type = category_json["goal_type"]
+        goal_target_month_str = category_json["goal_target_month"]
+        goal_target_month = None
+        if goal_target_month_str:
+            goal_target_month = datetime.strptime(goal_target_month_str, "%Y-%m-%d").date()
+        goal_months_to_budget = category_json["goal_months_to_budget"]
+        category_group_name = category_json["category_group_name"]
+        
+        if goal_type:
+            if goal_type == "TB" or goal_type == "MF":
+                self.term = "medium"
+                return
+            
+        if goal_months_to_budget:
+            if goal_months_to_budget <= 3:
+                self.term = "short"
+                return
+            if goal_months_to_budget <= 5*12:
+                self.term = "medium"
+                return
+            
+        if goal_target_month:
+            if goal_target_month <= datetime.today().date() + timedelta(days=3*30):
+                self.term = "short"
+                return
+            if goal_target_month <= datetime.today().date() + timedelta(days=5*365):
+                self.term = "medium"
+                return
+            
+        if category_group_name:
+            if category_group_name == "Credit Card Payments":
+                self.term = "short"
+                return
+            
+        if self.name == "💳 Amex Membership":
+            self.term = "medium"
+            
+        self.term = "long"
 
     def __str__(self):
         return self.name
