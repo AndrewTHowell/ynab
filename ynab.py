@@ -110,7 +110,7 @@ def main():
     active_categories = [
         category for category in categories
         #if not category.hidden and not category.deleted and
-        if not category.name == "Inflow: Ready to Assign"
+        if not category.category_group_name in ["Internal Master Category", "Credit Card Payments"]
     ]
     
     active_categories.sort(key = lambda x: (x.name))
@@ -156,7 +156,6 @@ def main():
     print(f"account_total: {account_total}")
     
     checksum = account_total - category_total
-    print(f"checksum: {checksum}")
     assert checksum == 0
     
     term_total_diff = {
