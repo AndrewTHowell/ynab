@@ -127,7 +127,7 @@ def main():
         ])
         category_total += category.balance
     print(categories_table)
-    print(f"category_total: {category_total}")
+    log.debug(f"category_total: {category_total}")
     
     categories_by_term = {}
     for category in active_categories:
@@ -153,12 +153,12 @@ def main():
         ])
         account_total += account.balance
     print(accounts_table)
-    print(f"account_total: {account_total}")
+    log.debug(f"account_total: {account_total}")
     
     checksum = account_total - category_total
     assert checksum == 0
     
-    term_total_diff = {
+    """ term_total_diff = {
         term: {
             "diff": term_totals[term],# - target_term_totals[term],
             #"target": target_term_totals[term],
@@ -186,7 +186,7 @@ def main():
             f"Needs ~{locale.currency(diff, grouping=True)} {operand}"
         ])
         
-    print(breakdown_by_terms)
+    print(breakdown_by_terms) """
         
 
 _budgets_url = "budgets"
