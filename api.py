@@ -1,6 +1,8 @@
 import urllib.parse
 from decimal import Decimal
 import re
+import os
+import json
 from typing import Any, Dict, List
 from datetime import datetime, timedelta
 from requests import exceptions, auth, Session
@@ -116,15 +118,29 @@ class Client():
     _budget_url = "budgets/{}"
     _budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
+    _cache_file_path = "data_cache.json"
     
     def __init__(self, auth_token: str, caching: str):
         self.auth = BearerAuth(auth_token)
+        self.session = Session()
+        self.cache = {}
         
         match caching:
             case "none":
-                self.session = Session()
+                pass
             case "naive":
                 self.session = requests_cache.CachedSession(cache_name="ynab_api_cache", expire_after=60)
+            case "delta":
+                if os.path.exists(self._cache_file_path):
+                    with open(self._cache_file_path) as f:
+                        self.cache = json.load(f)
+     
+    def __enter__(self):
+        return self
+ 
+    def __exit__(self, *args):
+        with open(self._cache_file_path, mode="w") as f:
+            json.dump(self.cache, f)  
     
     def get(self, url: str):
         resp_dict = {}

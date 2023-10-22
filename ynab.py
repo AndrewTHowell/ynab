@@ -3,7 +3,6 @@ from decimal import Decimal
 import json
 import logging
 import os
-from typing import Dict
 import locale
 from prettytable import PrettyTable
 import api
@@ -67,21 +66,20 @@ def main():
     auth_token = config["auth_token"]
     log.debug(f"auth_token: {auth_token}")
     
-    client = api.Client(auth_token=auth_token, caching=args.caching)
-    
     budget_name = ""
     if "budget_name" in config:
         budget_name = config["budget_name"]
     log.debug(f"budget_name: {budget_name}")
-        
-    if budget_name:
-        budget = client.get_budget_by_name(name=budget_name)
-    else:
-        budget = client.get_last_used_budget()
-            
-    accounts = client.get_accounts(budget_id=budget["id"])
     
-    categories = client.get_categories(budget_id=budget["id"])
+    with api.Client(auth_token=auth_token, caching=args.caching) as client:       
+        if budget_name:
+            budget = client.get_budget_by_name(name=budget_name)
+        else:
+            budget = client.get_last_used_budget()
+                
+        accounts = client.get_accounts(budget_id=budget["id"])
+        
+        categories = client.get_categories(budget_id=budget["id"])
     
     open_accounts = [
         account for account in accounts
@@ -184,13 +182,6 @@ def main():
         ])
         
     print(breakdown_by_terms) """
-      
-def get_cached_data() -> Dict:
-    if not os.path.exists("data_cache.json"):
-        return {}
-    
-    with open("data_cache.json") as f:
-        return json.load(f)
 
 if __name__ == "__main__":
     main()
