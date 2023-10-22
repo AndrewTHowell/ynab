@@ -118,20 +118,22 @@ class Client():
     _budget_url = "budgets/{}"
     _budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
-    _cache_file_path = "data_cache.json"
+    _cache_file_path = "delta_cache.json"
     
     def __init__(self, auth_token: str, caching: str):
         self.auth = BearerAuth(auth_token)
         self.session = Session()
-        self.cache = {}
+        self.cache = None
         
         match caching:
             case "none":
                 pass
             case "naive":
-                self.session = requests_cache.CachedSession(cache_name="ynab_api_cache", expire_after=60)
+                self.session = requests_cache.CachedSession(cache_name="naive_cache", expire_after=60)
             case "delta":
-                if os.path.exists(self._cache_file_path):
+                if not os.path.exists(self._cache_file_path):
+                    self.cache = {}
+                else:
                     with open(self._cache_file_path) as f:
                         self.cache = json.load(f)
      
@@ -139,15 +141,26 @@ class Client():
         return self
  
     def __exit__(self, *args):
-        with open(self._cache_file_path, mode="w") as f:
-            json.dump(self.cache, f)  
+        print(f"exit self.cache: {self.cache}")
+        if not self.cache is None:
+            with open(self._cache_file_path, mode="w") as f:
+                json.dump(self.cache, f)  
     
     def get(self, url: str):
+        # Check cache
+        params={}
+        print(f"self.cache: {self.cache}")
+        if not self.cache is None and url in self.cache:
+            params["last_knowledge_of_server"] = self.cache[url]["server_knowledge"]
+        
+        print(f"params: {params}")
+        
         resp_dict = {}
         try:
             resp = self.session.get(
                 urllib.parse.urljoin(self._base_url, url),
-                auth=self.auth,
+                params=params,
+                auth=self.auth
             )
             resp.raise_for_status()
             resp_dict = resp.json()
@@ -156,12 +169,40 @@ class Client():
             log.error(f"Bad HTTP status code: {e}")
         except exceptions.RequestException as e:
             log.error(f"Network error: {e}")
-
-        return resp_dict
+            
+        resp_data = resp_dict["data"]
+        
+        if not self.cache is None and "server_knowledge" in resp_data:
+            cached_data = {}
+            if url in self.cache:
+                cached_data = self.cache[url]
+            cached_data["server_knowledge"] = resp_data["server_knowledge"]
+            
+            # There should only be one key other than server_knowledge
+            for resource_name in resp_data.keys():
+                if resource_name == "server_knowledge":
+                    pass
+                
+                for resource in resp_data[resource_name]:
+                    # Add or replace
+                    idx = -1
+                    for i, cached_resource in enumerate(cached_data[resource_name]):
+                        if cached_resource["id"] == resource["id"]:
+                            idx = i
+                    
+                    if idx == -1:
+                        cached_data[resource_name].append(resource)
+                    else:
+                        cached_data[resource_name][idx] = resource
+            
+            self.cache[url] = cached_data
+            resp_data = cached_data
+                   
+        return resp_data
     
     def get_budgets(self) -> Dict:
-        resp_dict = self.get(self._budgets_url)
-        return resp_dict["data"]["budgets"]
+        resp_data = self.get(self._budgets_url)
+        return resp_data["budgets"]
 
     def get_budget_by_name(self, name: str) -> Dict[str, Any]:
         budgets = self.get_budgets()
@@ -173,20 +214,20 @@ class Client():
         return None # type: ignore
 
     def get_last_used_budget(self) -> Dict[str, Any]:
-        resp_dict = self.get(self._budget_url.format("last-used"))
-        return resp_dict["data"]["budget"]
+        resp_data = self.get(self._budget_url.format("last-used"))
+        return resp_data["budget"]
     
     def get_accounts(self, budget_id: str) -> List[Account]:            
-        resp_dict = self.get(self._accounts_url.format(budget_id))
+        resp_data = self.get(self._accounts_url.format(budget_id))
         return [
             Account(account_json)
-            for account_json in resp_dict["data"]["accounts"]
+            for account_json in resp_data["accounts"]
         ]  
        
     def get_categories(self, budget_id: str) -> List[Category]:    
-        resp_dict = self.get(self._categories_url.format(budget_id))
+        resp_data = self.get(self._categories_url.format(budget_id))
         return [
             Category(category_json)
-            for category_group in resp_dict["data"]["category_groups"]
+            for category_group in resp_data["category_groups"]
             for category_json in category_group["categories"]
         ] 
