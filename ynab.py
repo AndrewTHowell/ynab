@@ -3,6 +3,7 @@ from decimal import Decimal
 import json
 import logging
 import os
+from typing import Dict
 import locale
 from prettytable import PrettyTable
 import api
@@ -40,23 +41,18 @@ def main():
         dest="config_file_path",
     )
     parser.add_argument(
+        "-ca", "--cache",
+        help="Configure what type of API caching to use.",
+        action='store',
+        choices=["none", "naive", "delta"],
+        default="naive",
+        dest="caching"
+    )
+    parser.add_argument(
         "-d", "--debug",
         help="Turn on debug logging.",
         action='store_true',
         dest="debug"
-    )
-    caching = parser.add_mutually_exclusive_group()
-    caching.add_argument(
-        "-nc", "--naive-cache",
-        help="Turn on naive API caching.",
-        action='store_true',
-        dest="naive_caching"
-    )
-    caching.add_argument(
-        "-dc", "--delta-cache",
-        help="Turn on API delta caching.",
-        action='store_true',
-        dest="delta_caching"
     )
     args = parser.parse_args()
     
@@ -70,9 +66,8 @@ def main():
 
     auth_token = config["auth_token"]
     log.debug(f"auth_token: {auth_token}")
-    auth = api.BearerAuth(auth_token)
     
-    session = api.get_session(caching=args.naive_caching)
+    client = api.Client(auth_token=auth_token, caching=args.caching)
     
     budget_name = ""
     if "budget_name" in config:
@@ -80,13 +75,13 @@ def main():
     log.debug(f"budget_name: {budget_name}")
         
     if budget_name:
-        budget = api.get_budget_by_name(session=session, auth=auth, name=budget_name)
+        budget = client.get_budget_by_name(name=budget_name)
     else:
-        budget = api.get_last_used_budget(session=session, auth=auth)
+        budget = client.get_last_used_budget()
             
-    accounts = api.get_accounts(session=session, auth=auth, budget_id=budget["id"])
+    accounts = client.get_accounts(budget_id=budget["id"])
     
-    categories = api.get_categories(session=session, auth=auth, budget_id=budget["id"])
+    categories = client.get_categories(budget_id=budget["id"])
     
     open_accounts = [
         account for account in accounts
@@ -189,8 +184,13 @@ def main():
         ])
         
     print(breakdown_by_terms) """
-        
-
+      
+def get_cached_data() -> Dict:
+    if not os.path.exists("data_cache.json"):
+        return {}
+    
+    with open("data_cache.json") as f:
+        return json.load(f)
 
 if __name__ == "__main__":
     main()

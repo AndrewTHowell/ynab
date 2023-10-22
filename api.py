@@ -14,16 +14,6 @@ locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-def get_session(caching) -> Session:
-    if caching:
-        return requests_cache.CachedSession(cache_name="ynab_api_cache", expire_after=60)
-    
-    return Session()
-    
-    
-        
-_base_url = "https://api.ynab.com/v1/"
-
 class BearerAuth(auth.AuthBase): # type: ignore
     def __init__(self, token):
         self.token = token
@@ -32,63 +22,17 @@ class BearerAuth(auth.AuthBase): # type: ignore
         r.headers["authorization"] = "Bearer " + self.token
         return r
 
-_budgets_url = "budgets"
-
-def get_budgets(session: Session, auth: Any) -> List[Any]:
-    requests_cache.disabled()
-    resp_dict = {}
-    try:
-        resp = session.get(urllib.parse.urljoin(_base_url, _budgets_url), auth=auth)
-        resp.raise_for_status()
-        resp_dict = resp.json()
-
-    except exceptions.HTTPError as e:
-        print("Bad HTTP status code:", e)
-    except exceptions.RequestException as e:
-        print("Network error:", e)
-
-    return resp_dict["data"]["budgets"]
-
-def get_budget_by_name(session: Session, auth: Any, name: str) -> Dict[str, Any]:
-    budgets = get_budgets(session=session, auth=auth)
-    
-    for budget in budgets:
-        if budget["name"] == name:
-            return budget
-    
-    return None # type: ignore
-
-_budget_url = "budgets/{}"
-
-def get_last_used_budget(session: Session, auth: Any) -> Dict[str, Any]:
-    resp_dict = {}
-    try:
-        resp = session.get(urllib.parse.urljoin(_base_url, _budget_url.format("last-used")), auth=auth)
-        resp.raise_for_status()
-        resp_dict = resp.json()
-
-    except exceptions.HTTPError as e:
-        print("Bad HTTP status code:", e)
-    except exceptions.RequestException as e:
-        print("Network error:", e)
-
-    return resp_dict["data"]["budget"]
-
-_term_pattern = r'\w+ Term'
-
 def get_term(note: str):
     log.debug(f"note: {note}")
     if not note:
         return ""
     
-    match = re.search(_term_pattern, note)
+    match = re.search(r'\w+ Term', note)
     if not match:
         return ""
     
     term = match.group(0)
     return term.split()[0].lower()
-
-_accounts_url = "budgets/{}/accounts"
 
 class Account:
     def __init__(self, account_json: Dict):
@@ -106,23 +50,6 @@ class Account:
     
     def __repr__(self):
         return self.__str__()
-
-    
-def get_accounts(session: Session, auth: Any, budget_id: str) -> List[Account]:
-    resp_dict = {}
-    try:
-        resp = session.get(urllib.parse.urljoin(_base_url, _accounts_url.format(budget_id)), auth=auth)
-        resp.raise_for_status()
-        resp_dict = resp.json()
-
-    except exceptions.HTTPError as e:
-        print("Bad HTTP status code:", e)
-    except exceptions.RequestException as e:
-        print("Network error:", e)
-
-    return [ Account(account_json) for account_json in resp_dict["data"]["accounts"]] 
-
-_categories_url = "budgets/{}/categories"
 
 class Category:
     def __init__(self, category_json: Dict):
@@ -182,24 +109,68 @@ class Category:
     def __repr__(self):
         return self.__str__()
 
-    
-def get_categories(session: Session, auth: Any, budget_id: str) -> List[Category]:
-    resp_dict = {}
-    try:
-        resp = session.get(urllib.parse.urljoin(_base_url, _categories_url.format(budget_id)), auth=auth)
-        resp.raise_for_status()
-        resp_dict = resp.json()
 
-    except exceptions.HTTPError as e:
-        print("Bad HTTP status code:", e)
-    except exceptions.RequestException as e:
-        print("Network error:", e)
+class Client():
+    _base_url = "https://api.ynab.com/v1/"
+    _accounts_url = "budgets/{}/accounts"
+    _budget_url = "budgets/{}"
+    _budgets_url = "budgets"
+    _categories_url = "budgets/{}/categories"
+    
+    def __init__(self, auth_token: str, caching: str):
+        self.auth = BearerAuth(auth_token)
         
-    log.debug(f"list categories json: {resp_dict}")
-
-    return [
-        Category(category_json)
-        for category_group in resp_dict["data"]["category_groups"]
-        for category_json in category_group["categories"]
-    ] 
+        match caching:
+            case "none":
+                self.session = Session()
+            case "naive":
+                self.session = requests_cache.CachedSession(cache_name="ynab_api_cache", expire_after=60)
     
+    def get(self, url: str):
+        resp_dict = {}
+        try:
+            resp = self.session.get(
+                urllib.parse.urljoin(self._base_url, url),
+                auth=self.auth,
+            )
+            resp.raise_for_status()
+            resp_dict = resp.json()
+
+        except exceptions.HTTPError as e:
+            print("Bad HTTP status code:", e)
+        except exceptions.RequestException as e:
+            print("Network error:", e)
+
+        return resp_dict
+    
+    def get_budgets(self) -> Dict:
+        resp_dict = self.get(self._budgets_url)
+        return resp_dict["data"]["budgets"]
+
+    def get_budget_by_name(self, name: str) -> Dict[str, Any]:
+        budgets = self.get_budgets()
+        
+        for budget in budgets:
+            if budget["name"] == name:
+                return budget
+        
+        return None # type: ignore
+
+    def get_last_used_budget(self) -> Dict[str, Any]:
+        resp_dict = self.get(self._budget_url.format("last-used"))
+        return resp_dict["data"]["budget"]
+    
+    def get_accounts(self, budget_id: str) -> List[Account]:            
+        resp_dict = self.get(self._accounts_url.format(budget_id))
+        return [
+            Account(account_json)
+            for account_json in resp_dict["data"]["accounts"]
+        ]  
+       
+    def get_categories(self, budget_id: str) -> List[Category]:    
+        resp_dict = self.get(self._categories_url.format(budget_id))
+        return [
+            Category(category_json)
+            for category_group in resp_dict["data"]["category_groups"]
+            for category_json in category_group["categories"]
+        ] 
