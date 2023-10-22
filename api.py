@@ -22,18 +22,6 @@ class BearerAuth(auth.AuthBase): # type: ignore
         r.headers["authorization"] = "Bearer " + self.token
         return r
 
-def get_term(note: str):
-    log.debug(f"note: {note}")
-    if not note:
-        return ""
-    
-    match = re.search(r'\w+ Term', note)
-    if not match:
-        return ""
-    
-    term = match.group(0)
-    return term.split()[0].lower()
-
 class Account:
     def __init__(self, account_json: Dict):
         log.debug(f"account_json: {account_json}")
@@ -42,8 +30,20 @@ class Account:
         self.name = account_json["name"]
         self.type = account_json["type"]
         self.balance = Decimal(account_json["balance"]) / Decimal(1000)
-        self.term = get_term(account_json["note"])
+        self.term = self.get_term(account_json["note"])
         self.closed = account_json["closed"]
+
+    def get_term(self, note: str):
+        log.debug(f"note: {note}")
+        if not note:
+            return ""
+        
+        match = re.search(r'\w+ Term', note)
+        if not match:
+            return ""
+        
+        term = match.group(0)
+        return term.split()[0].lower()
 
     def __str__(self):
         return self.name
@@ -137,9 +137,9 @@ class Client():
             resp_dict = resp.json()
 
         except exceptions.HTTPError as e:
-            print("Bad HTTP status code:", e)
+            log.error(f"Bad HTTP status code: {e}")
         except exceptions.RequestException as e:
-            print("Network error:", e)
+            log.error(f"Network error: {e}")
 
         return resp_dict
     
