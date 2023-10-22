@@ -5,7 +5,7 @@ import logging
 import os
 import locale
 from prettytable import PrettyTable
-from api import *
+import api
 
 logging.basicConfig(format="%(levelname)s: %(message)s")
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
@@ -45,11 +45,18 @@ def main():
         action='store_true',
         dest="debug"
     )
-    parser.add_argument(
-        "-nc", "--no-cache",
-        help="Turn on API caching.",
+    caching = parser.add_mutually_exclusive_group()
+    caching.add_argument(
+        "-nc", "--naive-cache",
+        help="Turn on naive API caching.",
         action='store_true',
-        dest="no_caching"
+        dest="naive_caching"
+    )
+    caching.add_argument(
+        "-dc", "--delta-cache",
+        help="Turn on API delta caching.",
+        action='store_true',
+        dest="delta_caching"
     )
     args = parser.parse_args()
     
@@ -63,9 +70,9 @@ def main():
 
     auth_token = config["auth_token"]
     log.debug(f"auth_token: {auth_token}")
-    auth = BearerAuth(auth_token)
+    auth = api.BearerAuth(auth_token)
     
-    session = get_session(no_caching=args.no_caching)
+    session = api.get_session(caching=args.naive_caching)
     
     budget_name = ""
     if "budget_name" in config:
@@ -73,11 +80,13 @@ def main():
     log.debug(f"budget_name: {budget_name}")
         
     if budget_name:
-        budget = get_budget_by_name(session=session, auth=auth, name=budget_name)
+        budget = api.get_budget_by_name(session=session, auth=auth, name=budget_name)
     else:
-        budget = get_last_used_budget(session=session, auth=auth)
+        budget = api.get_last_used_budget(session=session, auth=auth)
             
-    accounts = get_accounts(session=session, auth=auth, budget_id=budget["id"])
+    accounts = api.get_accounts(session=session, auth=auth, budget_id=budget["id"])
+    
+    categories = api.get_categories(session=session, auth=auth, budget_id=budget["id"])
     
     open_accounts = [
         account for account in accounts
@@ -99,7 +108,6 @@ def main():
     net_worth.add_row([locale.currency(category_total, grouping=True)])
     print(net_worth)
         
-    categories = get_categories(session=session, auth=auth, budget_id=budget["id"])
     
     active_categories = [
         category for category in categories

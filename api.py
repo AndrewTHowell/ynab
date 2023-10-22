@@ -14,11 +14,12 @@ locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-def get_session(no_caching) -> Session:
-    if no_caching:
-        return Session()
+def get_session(caching) -> Session:
+    if caching:
+        return requests_cache.CachedSession(cache_name="ynab_api_cache", expire_after=60)
     
-    return requests_cache.CachedSession(cache_name="ynab_api_cache", expire_after=60)
+    return Session()
+    
     
         
 _base_url = "https://api.ynab.com/v1/"
