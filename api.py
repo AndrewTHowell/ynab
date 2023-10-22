@@ -3,7 +3,8 @@ from decimal import Decimal
 import re
 from typing import Any, Dict, List
 from datetime import datetime, timedelta
-import requests
+from requests import exceptions, auth, Session
+import requests_cache
 import logging
 import locale
 
@@ -13,9 +14,16 @@ locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
+def get_session(no_caching) -> Session:
+    if no_caching:
+        return Session()
+    
+    return requests_cache.CachedSession(cache_name="ynab_api_cache", expire_after=60)
+    
+        
 _base_url = "https://api.ynab.com/v1/"
 
-class BearerAuth(requests.auth.AuthBase): # type: ignore
+class BearerAuth(auth.AuthBase): # type: ignore
     def __init__(self, token):
         self.token = token
         
@@ -25,22 +33,23 @@ class BearerAuth(requests.auth.AuthBase): # type: ignore
 
 _budgets_url = "budgets"
 
-def get_budgets(auth: Any) -> List[Any]:
+def get_budgets(session: Session, auth: Any) -> List[Any]:
+    requests_cache.disabled()
     resp_dict = {}
     try:
-        resp = requests.get(urllib.parse.urljoin(_base_url, _budgets_url), auth=auth)
+        resp = session.get(urllib.parse.urljoin(_base_url, _budgets_url), auth=auth)
         resp.raise_for_status()
         resp_dict = resp.json()
 
-    except requests.exceptions.HTTPError as e:
+    except exceptions.HTTPError as e:
         print("Bad HTTP status code:", e)
-    except requests.exceptions.RequestException as e:
+    except exceptions.RequestException as e:
         print("Network error:", e)
 
     return resp_dict["data"]["budgets"]
 
-def get_budget_by_name(auth: Any, name: str) -> Dict[str, Any]:
-    budgets = get_budgets(auth=auth)
+def get_budget_by_name(session: Session, auth: Any, name: str) -> Dict[str, Any]:
+    budgets = get_budgets(session=session, auth=auth)
     
     for budget in budgets:
         if budget["name"] == name:
@@ -50,16 +59,16 @@ def get_budget_by_name(auth: Any, name: str) -> Dict[str, Any]:
 
 _budget_url = "budgets/{}"
 
-def get_last_used_budget(auth: Any) -> Dict[str, Any]:
+def get_last_used_budget(session: Session, auth: Any) -> Dict[str, Any]:
     resp_dict = {}
     try:
-        resp = requests.get(urllib.parse.urljoin(_base_url, _budget_url.format("last-used")), auth=auth)
+        resp = session.get(urllib.parse.urljoin(_base_url, _budget_url.format("last-used")), auth=auth)
         resp.raise_for_status()
         resp_dict = resp.json()
 
-    except requests.exceptions.HTTPError as e:
+    except exceptions.HTTPError as e:
         print("Bad HTTP status code:", e)
-    except requests.exceptions.RequestException as e:
+    except exceptions.RequestException as e:
         print("Network error:", e)
 
     return resp_dict["data"]["budget"]
@@ -98,16 +107,16 @@ class Account:
         return self.__str__()
 
     
-def get_accounts(auth: Any, budget_id: str) -> List[Account]:
+def get_accounts(session: Session, auth: Any, budget_id: str) -> List[Account]:
     resp_dict = {}
     try:
-        resp = requests.get(urllib.parse.urljoin(_base_url, _accounts_url.format(budget_id)), auth=auth)
+        resp = session.get(urllib.parse.urljoin(_base_url, _accounts_url.format(budget_id)), auth=auth)
         resp.raise_for_status()
         resp_dict = resp.json()
 
-    except requests.exceptions.HTTPError as e:
+    except exceptions.HTTPError as e:
         print("Bad HTTP status code:", e)
-    except requests.exceptions.RequestException as e:
+    except exceptions.RequestException as e:
         print("Network error:", e)
 
     return [ Account(account_json) for account_json in resp_dict["data"]["accounts"]] 
@@ -173,16 +182,16 @@ class Category:
         return self.__str__()
 
     
-def get_categories(auth: Any, budget_id: str) -> List[Category]:
+def get_categories(session: Session, auth: Any, budget_id: str) -> List[Category]:
     resp_dict = {}
     try:
-        resp = requests.get(urllib.parse.urljoin(_base_url, _categories_url.format(budget_id)), auth=auth)
+        resp = session.get(urllib.parse.urljoin(_base_url, _categories_url.format(budget_id)), auth=auth)
         resp.raise_for_status()
         resp_dict = resp.json()
 
-    except requests.exceptions.HTTPError as e:
+    except exceptions.HTTPError as e:
         print("Bad HTTP status code:", e)
-    except requests.exceptions.RequestException as e:
+    except exceptions.RequestException as e:
         print("Network error:", e)
         
     log.debug(f"list categories json: {resp_dict}")

@@ -45,6 +45,12 @@ def main():
         action='store_true',
         dest="debug"
     )
+    parser.add_argument(
+        "-nc", "--no-cache",
+        help="Turn on API caching.",
+        action='store_true',
+        dest="no_caching"
+    )
     args = parser.parse_args()
     
     if args.debug:
@@ -59,17 +65,19 @@ def main():
     log.debug(f"auth_token: {auth_token}")
     auth = BearerAuth(auth_token)
     
+    session = get_session(no_caching=args.no_caching)
+    
     budget_name = ""
     if "budget_name" in config:
         budget_name = config["budget_name"]
     log.debug(f"budget_name: {budget_name}")
         
     if budget_name:
-        budget = get_budget_by_name(auth=auth, name=budget_name)
+        budget = get_budget_by_name(session=session, auth=auth, name=budget_name)
     else:
-        budget = get_last_used_budget(auth=auth)
+        budget = get_last_used_budget(session=session, auth=auth)
             
-    accounts = get_accounts(auth=auth, budget_id=budget["id"])
+    accounts = get_accounts(session=session, auth=auth, budget_id=budget["id"])
     
     open_accounts = [
         account for account in accounts
@@ -91,7 +99,7 @@ def main():
     net_worth.add_row([locale.currency(category_total, grouping=True)])
     print(net_worth)
         
-    categories = get_categories(auth=auth, budget_id=budget["id"])
+    categories = get_categories(session=session, auth=auth, budget_id=budget["id"])
     
     active_categories = [
         category for category in categories
