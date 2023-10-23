@@ -5,6 +5,7 @@ import os
 import json
 from typing import Any, Dict, List
 from datetime import datetime, timedelta
+import jsonpickle
 from requests import exceptions, auth, Session
 import requests_cache
 import logging
@@ -46,6 +47,19 @@ class Account:
         
         term = match.group(0)
         return term.split()[0].lower()
+
+    def __str__(self):
+        return self.name
+    
+    def __repr__(self):
+        return self.__str__()
+    
+class Budget:
+    def __init__(self, budget_json: Dict):
+        log.debug(f"budget_json: {budget_json}")
+        
+        self.id = budget_json["id"]
+        self.name = budget_json["name"]
 
     def __str__(self):
         return self.name
@@ -135,25 +149,23 @@ class Client():
                     self.cache = {}
                 else:
                     with open(self._cache_file_path) as f:
-                        self.cache = json.load(f)
+                        encoded_cache = json.load(f)
+                        self.cache = jsonpickle.decode(str(encoded_cache))
      
     def __enter__(self):
         return self
  
     def __exit__(self, *args):
-        print(f"exit self.cache: {self.cache}")
         if not self.cache is None:
+            encoded_cache = jsonpickle.encode(self.cache)
             with open(self._cache_file_path, mode="w") as f:
-                json.dump(self.cache, f)  
+                json.dump(encoded_cache, f)  
     
-    def get(self, url: str):
+    def get(self, url: str, server_knowledge=None):
         # Check cache
         params={}
-        print(f"self.cache: {self.cache}")
-        if not self.cache is None and url in self.cache:
-            params["last_knowledge_of_server"] = self.cache[url]["server_knowledge"]
-        
-        print(f"params: {params}")
+        if not server_knowledge is None:
+            params["last_knowledge_of_server"] = server_knowledge
         
         resp_dict = {}
         try:
@@ -170,59 +182,46 @@ class Client():
         except exceptions.RequestException as e:
             log.error(f"Network error: {e}")
             
-        resp_data = resp_dict["data"]
-        
-        if not self.cache is None and "server_knowledge" in resp_data:
-            cached_data = {}
-            if url in self.cache:
-                cached_data = self.cache[url]
-            cached_data["server_knowledge"] = resp_data["server_knowledge"]
-            
-            # There should only be one key other than server_knowledge
-            for resource_name in resp_data.keys():
-                if resource_name == "server_knowledge":
-                    pass
-                
-                for resource in resp_data[resource_name]:
-                    # Add or replace
-                    idx = -1
-                    for i, cached_resource in enumerate(cached_data[resource_name]):
-                        if cached_resource["id"] == resource["id"]:
-                            idx = i
-                    
-                    if idx == -1:
-                        cached_data[resource_name].append(resource)
-                    else:
-                        cached_data[resource_name][idx] = resource
-            
-            self.cache[url] = cached_data
-            resp_data = cached_data
-                   
-        return resp_data
-    
-    def get_budgets(self) -> Dict:
-        resp_data = self.get(self._budgets_url)
-        return resp_data["budgets"]
+        return resp_dict["data"]
 
-    def get_budget_by_name(self, name: str) -> Dict[str, Any]:
-        budgets = self.get_budgets()
+    def get_last_used_budget(self) -> Budget:
+        cache_key = "budget"
         
-        for budget in budgets:
-            if budget["name"] == name:
-                return budget
-        
-        return None # type: ignore
-
-    def get_last_used_budget(self) -> Dict[str, Any]:
+        if not self.cache is None and cache_key in self.cache:
+            return self.cache[cache_key][cache_key]
+            
         resp_data = self.get(self._budget_url.format("last-used"))
-        return resp_data["budget"]
+        budget = Budget(resp_data["budget"])
+        
+        if not self.cache is None:
+            self.cache[cache_key] = {
+                "server_knowledge": resp_data["server_knowledge"],
+                cache_key: budget
+            }
+            
+        return budget       
+        
     
-    def get_accounts(self, budget_id: str) -> List[Account]:            
-        resp_data = self.get(self._accounts_url.format(budget_id))
-        return [
+    def get_accounts(self, budget_id: str) -> List[Account]:     
+        cache_key = "accounts"
+        
+        server_knowledge = None
+        if not self.cache is None and cache_key in self.cache:
+            server_knowledge = self.cache[cache_key]["server_knowledge"]
+                   
+        resp_data = self.get(self._accounts_url.format(budget_id), server_knowledge)
+        accounts = [
             Account(account_json)
             for account_json in resp_data["accounts"]
-        ]  
+        ]
+        
+        if not self.cache is None:
+            self.cache[cache_key] = {
+                "server_knowledge": resp_data["server_knowledge"],
+                cache_key: accounts
+            }
+            
+        return accounts  
        
     def get_categories(self, budget_id: str) -> List[Category]:    
         resp_data = self.get(self._categories_url.format(budget_id))

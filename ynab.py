@@ -72,15 +72,13 @@ def main():
     log.debug(f"budget_name: {budget_name}")
     
     with api.Client(auth_token=auth_token, caching=args.caching) as client:       
-        if budget_name:
-            budget = client.get_budget_by_name(name=budget_name)
-        else:
-            budget = client.get_last_used_budget()
+        budget = client.get_last_used_budget()
+                        
+        accounts = client.get_accounts(budget_id=budget.id)
         
-                
-        #accounts = client.get_accounts(budget_id=budget["id"])
+        print(accounts)
         
-        #categories = client.get_categories(budget_id=budget["id"])
+        #categories = client.get_categories(budget_id=budget.id)
     
     return
 
