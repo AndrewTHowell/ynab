@@ -3,6 +3,7 @@ from decimal import Decimal
 import re
 import os
 import json
+import ast
 from typing import Any, Dict, List
 from datetime import datetime, timedelta
 import jsonpickle
@@ -125,7 +126,6 @@ class Category:
     def __repr__(self):
         return self.__str__()
 
-
 class Client():
     _base_url = "https://api.ynab.com/v1/"
     _accounts_url = "budgets/{}/accounts"
@@ -150,6 +150,7 @@ class Client():
                 else:
                     with open(self._cache_file_path) as f:
                         encoded_cache = json.load(f)
+                        log.debug(f"encoded_cache: {encoded_cache}")
                         self.cache = jsonpickle.decode(str(encoded_cache))
      
     def __enter__(self):
@@ -158,6 +159,7 @@ class Client():
     def __exit__(self, *args):
         if not self.cache is None:
             encoded_cache = jsonpickle.encode(self.cache)
+            log.debug(f"encoded_cache: {encoded_cache}")
             with open(self._cache_file_path, mode="w") as f:
                 json.dump(encoded_cache, f)  
     
@@ -216,9 +218,26 @@ class Client():
         ]
         
         if not self.cache is None:
+            cached_accounts: List[Account] = []
+            if cache_key in self.cache:
+                cached_accounts = self.cache[cache_key][cache_key]
+            
+            accounts_to_cache = accounts
+            for cached_account in cached_accounts:
+                found = False
+                for account_to_cache in accounts_to_cache:
+                    if cached_account.id == account_to_cache.id:
+                        # Cached account was also in the delta response
+                        found = True
+                
+                if not found:
+                    # Cached account wasn't in delta response, so it's not stale and should be kept
+                    accounts_to_cache.append(cached_account)
+                    
+            
             self.cache[cache_key] = {
                 "server_knowledge": resp_data["server_knowledge"],
-                cache_key: accounts
+                cache_key: accounts_to_cache
             }
             
         return accounts  
