@@ -1,27 +1,24 @@
 import urllib.parse
 from decimal import Decimal
 import re
-from typing import Any, Dict, List
+import os
+import json
+from typing import Any, Dict, List, Protocol, Sequence
 from datetime import datetime, timedelta
+import jsonpickle
 from requests import exceptions, auth, Session
 import requests_cache
 import logging
 import locale
 
-logging.basicConfig(format="%(levelname)s: %(message)s")
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
-
+logging.basicConfig(format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
-def get_session(no_caching) -> Session:
-    if no_caching:
-        return Session()
-    
-    return requests_cache.CachedSession(cache_name="ynab_api_cache", expire_after=60)
-    
-        
-_base_url = "https://api.ynab.com/v1/"
+_CACHE_DIR_PATH = ".cache"
+_REQUEST_CACHE_FILE_NAME = "requests"
+_DELTA_CACHE_FILE = "delta.json"
 
 class BearerAuth(auth.AuthBase): # type: ignore
     def __init__(self, token):
@@ -31,64 +28,6 @@ class BearerAuth(auth.AuthBase): # type: ignore
         r.headers["authorization"] = "Bearer " + self.token
         return r
 
-_budgets_url = "budgets"
-
-def get_budgets(session: Session, auth: Any) -> List[Any]:
-    requests_cache.disabled()
-    resp_dict = {}
-    try:
-        resp = session.get(urllib.parse.urljoin(_base_url, _budgets_url), auth=auth)
-        resp.raise_for_status()
-        resp_dict = resp.json()
-
-    except exceptions.HTTPError as e:
-        print("Bad HTTP status code:", e)
-    except exceptions.RequestException as e:
-        print("Network error:", e)
-
-    return resp_dict["data"]["budgets"]
-
-def get_budget_by_name(session: Session, auth: Any, name: str) -> Dict[str, Any]:
-    budgets = get_budgets(session=session, auth=auth)
-    
-    for budget in budgets:
-        if budget["name"] == name:
-            return budget
-    
-    return None # type: ignore
-
-_budget_url = "budgets/{}"
-
-def get_last_used_budget(session: Session, auth: Any) -> Dict[str, Any]:
-    resp_dict = {}
-    try:
-        resp = session.get(urllib.parse.urljoin(_base_url, _budget_url.format("last-used")), auth=auth)
-        resp.raise_for_status()
-        resp_dict = resp.json()
-
-    except exceptions.HTTPError as e:
-        print("Bad HTTP status code:", e)
-    except exceptions.RequestException as e:
-        print("Network error:", e)
-
-    return resp_dict["data"]["budget"]
-
-_term_pattern = r'\w+ Term'
-
-def get_term(note: str):
-    log.debug(f"note: {note}")
-    if not note:
-        return ""
-    
-    match = re.search(_term_pattern, note)
-    if not match:
-        return ""
-    
-    term = match.group(0)
-    return term.split()[0].lower()
-
-_accounts_url = "budgets/{}/accounts"
-
 class Account:
     def __init__(self, account_json: Dict):
         log.debug(f"account_json: {account_json}")
@@ -97,31 +36,39 @@ class Account:
         self.name = account_json["name"]
         self.type = account_json["type"]
         self.balance = Decimal(account_json["balance"]) / Decimal(1000)
-        self.term = get_term(account_json["note"])
+        self.term = self.get_term(account_json["note"])
         self.closed = account_json["closed"]
+
+    def get_term(self, note: str):
+        log.debug(f"note: {note}")
+        if not note:
+            return ""
+        
+        match = re.search(r'\w+ Term', note)
+        if not match:
+            return ""
+        
+        term = match.group(0)
+        return term.split()[0].lower()
 
     def __str__(self):
         return self.name
     
     def __repr__(self):
         return self.__str__()
-
     
-def get_accounts(session: Session, auth: Any, budget_id: str) -> List[Account]:
-    resp_dict = {}
-    try:
-        resp = session.get(urllib.parse.urljoin(_base_url, _accounts_url.format(budget_id)), auth=auth)
-        resp.raise_for_status()
-        resp_dict = resp.json()
+class Budget:
+    def __init__(self, budget_json: Dict):
+        log.debug(f"budget_json: {budget_json}")
+        
+        self.id = budget_json["id"]
+        self.name = budget_json["name"]
 
-    except exceptions.HTTPError as e:
-        print("Bad HTTP status code:", e)
-    except exceptions.RequestException as e:
-        print("Network error:", e)
-
-    return [ Account(account_json) for account_json in resp_dict["data"]["accounts"]] 
-
-_categories_url = "budgets/{}/categories"
+    def __str__(self):
+        return self.name
+    
+    def __repr__(self):
+        return self.__str__()
 
 class Category:
     def __init__(self, category_json: Dict):
@@ -181,24 +128,146 @@ class Category:
     def __repr__(self):
         return self.__str__()
 
+class DeltaCacheData(Protocol):
+    id: str
     
-def get_categories(session: Session, auth: Any, budget_id: str) -> List[Category]:
-    resp_dict = {}
-    try:
-        resp = session.get(urllib.parse.urljoin(_base_url, _categories_url.format(budget_id)), auth=auth)
-        resp.raise_for_status()
-        resp_dict = resp.json()
-
-    except exceptions.HTTPError as e:
-        print("Bad HTTP status code:", e)
-    except exceptions.RequestException as e:
-        print("Network error:", e)
+class DeltaCacheItem():
+    def __init__(self, server_knowledge: int, data: DeltaCacheData | List[DeltaCacheData]):
+        self.server_knowledge = server_knowledge
+        self.data = data
         
-    log.debug(f"list categories json: {resp_dict}")
+class DeltaCache(dict):
+    def __init__(self, file_path: str):
+        super(DeltaCache, self).__init__()
+        self._file_path = file_path
+        self.load_from_file()
+                
+    def load_from_file(self):
+        if os.path.exists(self._file_path):
+            with open(self._file_path) as f:
+                encoded_cache = json.load(f)
+                log.debug(f"encoded_cache: {encoded_cache}")
+                cache: Dict = jsonpickle.decode(str(encoded_cache)) # type: ignore
+                
+                self.clear()
+                self.update(cache)
+                
+    def save_to_file(self):
+        file_path = self._file_path
+        del self._file_path
+        
+        encoded_cache = jsonpickle.encode(self)
+        log.debug(f"encoded_cache: {encoded_cache}")
+        with open(file_path, mode="w") as f:
+            json.dump(encoded_cache, f)
+            
+    def update_data(self, key: str, server_knowledge:int, data: List[Any]):
+        cached_data = []
+        if key in self:
+            cached_data = self[key].data
+        
+        data_to_cache = data
+        for cached_datum in cached_data:
+            found = False
+            for datum_to_cache in data_to_cache:
+                if cached_datum.id == datum_to_cache.id:
+                    # Cached datum was also in the delta response
+                    found = True
+            
+            if not found:
+                # Cached datum wasn't in delta response, so it's not stale and should be kept
+                data_to_cache.append(cached_datum)
+        
+        self[key] = DeltaCacheItem(server_knowledge, data_to_cache)
 
-    return [
-        Category(category_json)
-        for category_group in resp_dict["data"]["category_groups"]
-        for category_json in category_group["categories"]
-    ] 
+class Client():
+    _base_url = "https://api.ynab.com/v1/"
+    _accounts_url = "budgets/{}/accounts"
+    _budget_url = "budgets/{}"
+    _budgets_url = "budgets"
+    _categories_url = "budgets/{}/categories"
     
+    def __init__(self, auth_token: str, cache: bool):
+        self.auth = BearerAuth(auth_token)
+        
+        if cache:
+            if not os.path.exists(_CACHE_DIR_PATH):
+                os.makedirs(_CACHE_DIR_PATH)
+            
+            self.session = requests_cache.CachedSession(
+                cache_name=os.path.join(_CACHE_DIR_PATH, _REQUEST_CACHE_FILE_NAME),
+                expire_after=30,
+            )
+            self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE))
+        else:
+            self.session = Session()
+            self.cache = None
+     
+    def __enter__(self):
+        return self
+ 
+    def __exit__(self, *args):
+        if not self.cache is None:
+            self.cache.save_to_file()
+    
+    def get(self, url: str, server_knowledge=None):
+        params={}
+        if not server_knowledge is None:
+            params["last_knowledge_of_server"] = server_knowledge
+        
+        resp_dict = {}
+        resp = self.session.get(
+            urllib.parse.urljoin(self._base_url, url),
+            params=params,
+            auth=self.auth
+        )
+        resp.raise_for_status()
+        log.debug(f"Request limit used: {resp.headers['X-Rate-Limit']}")
+            
+        resp_dict = resp.json()
+        return resp_dict["data"]
+        
+    def get_last_used_budget(self) -> Budget:        
+        if not self.cache is None and "budget" in self.cache:
+            return self.cache["budget"].data
+            
+        resp_data = self.get(self._budget_url.format("last-used"))
+        budget = Budget(resp_data["budget"])
+        
+        if not self.cache is None:
+            self.cache["budget"] = DeltaCacheItem(resp_data["server_knowledge"], budget)
+            
+        return budget
+
+    def get_accounts(self, budget_id: str) -> List[Account]:
+        server_knowledge = None
+        if not self.cache is None and "accounts" in self.cache:
+            server_knowledge = self.cache["accounts"].server_knowledge
+                   
+        resp_data = self.get(self._accounts_url.format(budget_id), server_knowledge)
+        accounts = [
+            Account(account_json)
+            for account_json in resp_data["accounts"]
+        ]
+        
+        if not self.cache is None:
+            self.cache.update_data("accounts", resp_data["server_knowledge"], accounts)
+            
+        return accounts  
+       
+    def get_categories(self, budget_id: str) -> List[Category]:  
+        server_knowledge = None
+        if not self.cache is None and "categories" in self.cache:
+            server_knowledge = self.cache["categories"].server_knowledge
+              
+        resp_data = self.get(self._categories_url.format(budget_id), server_knowledge)
+        categories = [
+            Category(category_json)
+            for category_group in resp_data["category_groups"]
+            for category_json in category_group["categories"]
+        ] 
+        
+        if not self.cache is None:
+            self.cache.update_data("categories", resp_data["server_knowledge"], categories)
+            
+        return categories 
