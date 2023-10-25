@@ -2,4 +2,4 @@
 
 ## TODO
 
-- Is server knowledge endpoint agnostic?
+- Fix logging in API
