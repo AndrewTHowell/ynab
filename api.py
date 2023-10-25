@@ -216,19 +216,13 @@ class Client():
             params["last_knowledge_of_server"] = server_knowledge
         
         resp_dict = {}
-        try:
-            resp = self.session.get(
-                urllib.parse.urljoin(self._base_url, url),
-                params=params,
-                auth=self.auth
-            )
-            resp.raise_for_status()
-            resp_dict = resp.json()
-
-        except exceptions.HTTPError as e:
-            log.error(f"Bad HTTP status code: {e}")
-        except exceptions.RequestException as e:
-            log.error(f"Network error: {e}")
+        resp = self.session.get(
+            urllib.parse.urljoin(self._base_url, url),
+            params=params,
+            auth=self.auth
+        )
+        resp.raise_for_status()
+        resp_dict = resp.json()
             
         return resp_dict["data"]
         
