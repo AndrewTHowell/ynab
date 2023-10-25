@@ -121,6 +121,12 @@ class Category:
             self.term = "medium"
             
         self.term = "long"
+    
+    def as_dict(self):
+        return {
+            "id": self.id, "name": self.name, "balance": self.balance, "term": self.term,
+            "category_group_name": self.category_group_name, "hidden": self.hidden, "deleted": self.deleted,
+        }
 
     def __str__(self):
         return self.name

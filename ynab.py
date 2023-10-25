@@ -6,6 +6,7 @@ import os
 import locale
 from prettytable import PrettyTable
 import api
+import pandas as pd
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 logging.basicConfig(format="%(levelname)s: %(message)s")
@@ -69,34 +70,31 @@ def main():
     log.debug(f"budget_name: {budget_name}")
     
     with api.Client(auth_token=auth_token, cache=args.cache) as client:       
-        budget = client.get_last_used_budget()
-                        
+        budget = client.get_last_used_budget()         
         accounts = client.get_accounts(budget_id=budget.id)
-        
         categories = client.get_categories(budget_id=budget.id)
-
-    open_accounts = [
-        account for account in accounts
-        #if not account.closed and account.name not in ["Pension", "Student Loan"]
-        if account.name not in ["Pension", "Student Loan"]
-    ]
-    open_accounts.sort(key = lambda x: (x.name))
+        
+    accounts = pd.DataFrame([ account.as_dict() for account in accounts ])
+    accounts.sort_values("name")
+    
+    categories = pd.DataFrame([ category.as_dict() for category in categories ])
+    categories.sort_values(
+        by=["name", "balance", "term"],
+        ascending=[True, True, False]
+    )
+    
+    print(generate_net_worth_report(accounts))
         
     active_categories = [
         category for category in categories
         #if not category.hidden and not category.deleted and
         if not category.category_group_name in ["Internal Master Category", "Credit Card Payments"]
     ]
-    active_categories.sort(key = lambda x: (x.name))
-    active_categories.sort(key = lambda x: (x.balance))
-    active_categories.sort(key = lambda x: (x.term), reverse=True)
-    
-    print(generate_net_worth_report(open_accounts))
     
     category_total, categories_table = generate_categories_report(active_categories)
     print(categories_table)
     
-    account_total, accounts_table = generate_accounts_report(open_accounts)
+    account_total, accounts_table = generate_accounts_report(accounts)
     print(accounts_table)
     
     log.debug(f"account_total: {account_total}")
@@ -168,12 +166,17 @@ def generate_categories_report(categories):
         
     return category_total,categories_table
 
-def generate_net_worth_report(open_accounts):
+def generate_net_worth_report(accounts):
+    open_accounts = accounts[
+        (accounts["closed"] == False) &
+        (accounts["name"].isin(["Pension", "Student Loan"]))
+    ]
+    
     term_totals = {term: Decimal(0) for term in _terms}
     account_names_by_term = {term: [] for term in _terms}
-    for open_account in open_accounts:
-        term_totals[open_account.term] += open_account.balance
-        account_names_by_term[open_account.term].append(open_account.name)
+    for account in open_accounts:
+        term_totals[account.term] += account.balance
+        account_names_by_term[account.term].append(account.name)
     
     account_total = Decimal(0)
     for term_total in term_totals.values():
