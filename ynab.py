@@ -7,9 +7,8 @@ import locale
 from prettytable import PrettyTable
 import api
 
-logging.basicConfig(format="%(levelname)s: %(message)s")
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
-
+logging.basicConfig(format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
@@ -33,7 +32,7 @@ def main():
         description="Script for consuming and processing YNAB data.",
     )
     parser.add_argument(
-        "-c", "--config_file_path",
+        "-cf", "--config_file_path",
         help="The path to the configuration for this script.",
         type=valid_file_path,
         required=True,
@@ -41,11 +40,9 @@ def main():
     )
     parser.add_argument(
         "-ca", "--cache",
-        help="Configure what type of API caching to use.",
-        action='store',
-        choices=["none", "naive", "delta"],
-        default="naive",
-        dest="caching"
+        help="Turn on API caching.",
+        action='store_true',
+        dest="cache"
     )
     parser.add_argument(
         "-d", "--debug",
@@ -71,7 +68,7 @@ def main():
         budget_name = config["budget_name"]
     log.debug(f"budget_name: {budget_name}")
     
-    with api.Client(auth_token=auth_token, caching=args.caching) as client:       
+    with api.Client(auth_token=auth_token, cache=args.cache) as client:       
         budget = client.get_last_used_budget()
                         
         accounts = client.get_accounts(budget_id=budget.id)

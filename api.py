@@ -11,11 +11,14 @@ import requests_cache
 import logging
 import locale
 
-logging.basicConfig(format="%(levelname)s: %(message)s")
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
-
+logging.basicConfig(format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
+
+_CACHE_DIR_PATH = ".cache"
+_REQUEST_CACHE_FILE_NAME = "requests"
+_DELTA_CACHE_FILE = "delta.json"
 
 class BearerAuth(auth.AuthBase): # type: ignore
     def __init__(self, token):
@@ -134,7 +137,7 @@ class DeltaCacheItem():
         self.data = data
         
 class DeltaCache(dict):
-    def __init__(self, file_path: str="delta_cache.json"):
+    def __init__(self, file_path: str):
         super(DeltaCache, self).__init__()
         self._file_path = file_path
         self.load_from_file()
@@ -158,8 +161,8 @@ class DeltaCache(dict):
         with open(file_path, mode="w") as f:
             json.dump(encoded_cache, f)
             
-    def update_data(self, key: str, server_knowledge:int, data: List[DeltaCacheData]):
-        cached_data: Sequence[DeltaCacheData] = []
+    def update_data(self, key: str, server_knowledge:int, data: List[Any]):
+        cached_data = []
         if key in self:
             cached_data = self[key].data
         
@@ -184,18 +187,21 @@ class Client():
     _budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
     
-    def __init__(self, auth_token: str, caching: str):
+    def __init__(self, auth_token: str, cache: bool):
         self.auth = BearerAuth(auth_token)
-        self.session = Session()
-        self.cache = None
         
-        match caching:
-            case "none":
-                pass
-            case "naive":
-                self.session = requests_cache.CachedSession(cache_name="naive_cache", expire_after=60)
-            case "delta":
-                self.cache = DeltaCache()
+        if cache:
+            if not os.path.exists(_CACHE_DIR_PATH):
+                os.makedirs(_CACHE_DIR_PATH)
+            
+            self.session = requests_cache.CachedSession(
+                cache_name=os.path.join(_CACHE_DIR_PATH, _REQUEST_CACHE_FILE_NAME),
+                expire_after=30,
+            )
+            self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE))
+        else:
+            self.session = Session()
+            self.cache = None
      
     def __enter__(self):
         return self
