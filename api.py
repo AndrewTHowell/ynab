@@ -87,9 +87,9 @@ class Category:
         self.hidden = category_json["hidden"]
         self.deleted = category_json["deleted"]
         
-        self.__set_term(category_json=category_json)
+        self._set_term(category_json=category_json)
         
-    def __set_term(self, category_json: Dict):
+    def _set_term(self, category_json: Dict):
         goal_type = category_json["goal_type"]
         goal_target_month_str = category_json["goal_target_month"]
         goal_target_month = None
