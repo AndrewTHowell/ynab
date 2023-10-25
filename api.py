@@ -50,6 +50,9 @@ class Account:
         
         term = match.group(0)
         return term.split()[0].lower()
+    
+    def as_dict(self):
+        return {"id": self.id, "name": self.name, "type": self.type, "balance": self.balance, "term": self.term, "closed": self.closed}
 
     def __str__(self):
         return self.name
@@ -63,6 +66,9 @@ class Budget:
         
         self.id = budget_json["id"]
         self.name = budget_json["name"]
+    
+    def as_dict(self):
+        return {"id": self.id, "name": self.name}
 
     def __str__(self):
         return self.name
@@ -121,6 +127,9 @@ class Category:
             self.term = "medium"
             
         self.term = "long"
+    
+    def as_dict(self):
+        return {"id": self.id, "name": self.name, "balance": self.balance, "category_group_name": self.category_group_name, "hidden": self.hidden, "deleted": self.deleted}
 
     def __str__(self):
         return self.name
