@@ -222,8 +222,9 @@ class Client():
             auth=self.auth
         )
         resp.raise_for_status()
-        resp_dict = resp.json()
+        log.debug(f"Request limit used: {resp.headers['X-Rate-Limit']}")
             
+        resp_dict = resp.json()
         return resp_dict["data"]
         
     def get_last_used_budget(self) -> Budget:        
