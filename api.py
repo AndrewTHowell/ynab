@@ -243,7 +243,7 @@ class Client():
             self.cache["budget"] = DeltaCacheItem(resp_data["server_knowledge"], budget)
             
         return budget
-    
+
     def get_accounts(self, budget_id: str) -> List[Account]:
         server_knowledge = None
         if not self.cache is None and "accounts" in self.cache:

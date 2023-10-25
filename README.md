@@ -2,5 +2,6 @@
 
 ## TODO
 
-- Move caching in domain-specific methods to decorator pattern
 - Is server knowledge endpoint agnostic?
+- Report rate limit
+- Except if network error
