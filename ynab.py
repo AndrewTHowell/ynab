@@ -76,11 +76,7 @@ def main():
                         
         accounts = client.get_accounts(budget_id=budget.id)
         
-        print(accounts)
-        
-        #categories = client.get_categories(budget_id=budget.id)
-    
-    return
+        categories = client.get_categories(budget_id=budget.id)
 
     open_accounts = [
         account for account in accounts

@@ -3,8 +3,7 @@ from decimal import Decimal
 import re
 import os
 import json
-import ast
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Protocol, Sequence
 from datetime import datetime, timedelta
 import jsonpickle
 from requests import exceptions, auth, Session
@@ -126,13 +125,64 @@ class Category:
     def __repr__(self):
         return self.__str__()
 
+class DeltaCacheData(Protocol):
+    id: str
+    
+class DeltaCacheItem():
+    def __init__(self, server_knowledge: int, data: DeltaCacheData | List[DeltaCacheData]):
+        self.server_knowledge = server_knowledge
+        self.data = data
+        
+class DeltaCache(dict):
+    def __init__(self, file_path: str="delta_cache.json"):
+        super(DeltaCache, self).__init__()
+        self._file_path = file_path
+        self.load_from_file()
+                
+    def load_from_file(self):
+        if os.path.exists(self._file_path):
+            with open(self._file_path) as f:
+                encoded_cache = json.load(f)
+                log.debug(f"encoded_cache: {encoded_cache}")
+                cache: Dict = jsonpickle.decode(str(encoded_cache)) # type: ignore
+                
+                self.clear()
+                self.update(cache)
+                
+    def save_to_file(self):
+        file_path = self._file_path
+        del self._file_path
+        
+        encoded_cache = jsonpickle.encode(self)
+        log.debug(f"encoded_cache: {encoded_cache}")
+        with open(file_path, mode="w") as f:
+            json.dump(encoded_cache, f)
+            
+    def update_data(self, key: str, server_knowledge:int, data: List[DeltaCacheData]):
+        cached_data: Sequence[DeltaCacheData] = []
+        if key in self:
+            cached_data = self[key].data
+        
+        data_to_cache = data
+        for cached_datum in cached_data:
+            found = False
+            for datum_to_cache in data_to_cache:
+                if cached_datum.id == datum_to_cache.id:
+                    # Cached datum was also in the delta response
+                    found = True
+            
+            if not found:
+                # Cached datum wasn't in delta response, so it's not stale and should be kept
+                data_to_cache.append(cached_datum)
+        
+        self[key] = DeltaCacheItem(server_knowledge, data_to_cache)
+
 class Client():
     _base_url = "https://api.ynab.com/v1/"
     _accounts_url = "budgets/{}/accounts"
     _budget_url = "budgets/{}"
     _budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
-    _cache_file_path = "delta_cache.json"
     
     def __init__(self, auth_token: str, caching: str):
         self.auth = BearerAuth(auth_token)
@@ -145,26 +195,16 @@ class Client():
             case "naive":
                 self.session = requests_cache.CachedSession(cache_name="naive_cache", expire_after=60)
             case "delta":
-                if not os.path.exists(self._cache_file_path):
-                    self.cache = {}
-                else:
-                    with open(self._cache_file_path) as f:
-                        encoded_cache = json.load(f)
-                        log.debug(f"encoded_cache: {encoded_cache}")
-                        self.cache = jsonpickle.decode(str(encoded_cache))
+                self.cache = DeltaCache()
      
     def __enter__(self):
         return self
  
     def __exit__(self, *args):
         if not self.cache is None:
-            encoded_cache = jsonpickle.encode(self.cache)
-            log.debug(f"encoded_cache: {encoded_cache}")
-            with open(self._cache_file_path, mode="w") as f:
-                json.dump(encoded_cache, f)  
+            self.cache.save_to_file()
     
     def get(self, url: str, server_knowledge=None):
-        # Check cache
         params={}
         if not server_knowledge is None:
             params["last_knowledge_of_server"] = server_knowledge
@@ -185,31 +225,23 @@ class Client():
             log.error(f"Network error: {e}")
             
         return resp_dict["data"]
-
-    def get_last_used_budget(self) -> Budget:
-        cache_key = "budget"
         
-        if not self.cache is None and cache_key in self.cache:
-            return self.cache[cache_key][cache_key]
+    def get_last_used_budget(self) -> Budget:        
+        if not self.cache is None and "budget" in self.cache:
+            return self.cache["budget"].data
             
         resp_data = self.get(self._budget_url.format("last-used"))
         budget = Budget(resp_data["budget"])
         
         if not self.cache is None:
-            self.cache[cache_key] = {
-                "server_knowledge": resp_data["server_knowledge"],
-                cache_key: budget
-            }
+            self.cache["budget"] = DeltaCacheItem(resp_data["server_knowledge"], budget)
             
-        return budget       
-        
+        return budget
     
-    def get_accounts(self, budget_id: str) -> List[Account]:     
-        cache_key = "accounts"
-        
+    def get_accounts(self, budget_id: str) -> List[Account]:
         server_knowledge = None
-        if not self.cache is None and cache_key in self.cache:
-            server_knowledge = self.cache[cache_key]["server_knowledge"]
+        if not self.cache is None and "accounts" in self.cache:
+            server_knowledge = self.cache["accounts"].server_knowledge
                    
         resp_data = self.get(self._accounts_url.format(budget_id), server_knowledge)
         accounts = [
@@ -218,34 +250,23 @@ class Client():
         ]
         
         if not self.cache is None:
-            cached_accounts: List[Account] = []
-            if cache_key in self.cache:
-                cached_accounts = self.cache[cache_key][cache_key]
-            
-            accounts_to_cache = accounts
-            for cached_account in cached_accounts:
-                found = False
-                for account_to_cache in accounts_to_cache:
-                    if cached_account.id == account_to_cache.id:
-                        # Cached account was also in the delta response
-                        found = True
-                
-                if not found:
-                    # Cached account wasn't in delta response, so it's not stale and should be kept
-                    accounts_to_cache.append(cached_account)
-                    
-            
-            self.cache[cache_key] = {
-                "server_knowledge": resp_data["server_knowledge"],
-                cache_key: accounts_to_cache
-            }
+            self.cache.update_data("accounts", resp_data["server_knowledge"], accounts)
             
         return accounts  
        
-    def get_categories(self, budget_id: str) -> List[Category]:    
-        resp_data = self.get(self._categories_url.format(budget_id))
-        return [
+    def get_categories(self, budget_id: str) -> List[Category]:  
+        server_knowledge = None
+        if not self.cache is None and "categories" in self.cache:
+            server_knowledge = self.cache["categories"].server_knowledge
+              
+        resp_data = self.get(self._categories_url.format(budget_id), server_knowledge)
+        categories = [
             Category(category_json)
             for category_group in resp_data["category_groups"]
             for category_json in category_group["categories"]
         ] 
+        
+        if not self.cache is None:
+            self.cache.update_data("categories", resp_data["server_knowledge"], categories)
+            
+        return categories 
