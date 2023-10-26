@@ -183,6 +183,7 @@ def format_currencies(df):
     return df.apply(format_column)
 
 def format_panda(df):
+    df.columns = map(str.title, df.columns)
     return tabulate(format_currencies(df), headers='keys', tablefmt="rounded_outline", showindex=False)
 
 def generate_net_worth_report(accounts):
