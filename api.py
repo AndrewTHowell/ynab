@@ -20,6 +20,10 @@ _CACHE_DIR_PATH = ".cache"
 _REQUEST_CACHE_FILE_NAME = "requests"
 _DELTA_CACHE_FILE = "delta.json"
 
+def milliunits_to_centiunits(num) -> int:
+    centiunit = num / int(10)
+    return int(centiunit)
+
 class BearerAuth(auth.AuthBase): # type: ignore
     def __init__(self, token):
         self.token = token
@@ -35,7 +39,7 @@ class Account:
         self.id = account_json["id"]
         self.name = account_json["name"]
         self.type = account_json["type"]
-        self.balance = Decimal(account_json["balance"]) / Decimal(1000)
+        self.balance = milliunits_to_centiunits(account_json["balance"])
         self.term = self.get_term(account_json["note"])
         self.closed = account_json["closed"]
 
@@ -82,7 +86,7 @@ class Category:
         
         self.id = category_json["id"]
         self.name = re.sub(r'[^\w :()]', '', category_json["name"]).lstrip(" ")
-        self.balance = Decimal(category_json["balance"]) / Decimal(1000)
+        self.balance = milliunits_to_centiunits(category_json["balance"])
         self.category_group_name = category_json["category_group_name"]
         self.hidden = category_json["hidden"]
         self.deleted = category_json["deleted"]

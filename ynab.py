@@ -85,6 +85,7 @@ def main():
     )
     
     print(generate_net_worth_report(accounts))
+    return
     
     account_total, accounts_table = generate_accounts_report(accounts)
     print(accounts_table)
@@ -168,26 +169,29 @@ def generate_categories_report(categories):
         
     return category_total,categories_table
 
-def format_currency(float):
-    return locale.currency(float, grouping=True)
+def format_currency(centiunit):
+    unit = centiunit / 100
+    return locale.currency(unit, grouping=True)
 
-def format_floats(df):
-    """Replaces all float columns with string columns formatted to 6 decimal places"""
+def format_currencies(df):
+    """Replaces all int columns with formatted string columns"""
     def format_column(col):
-        if col.dtype != float:
+        if col.dtype != int:
             return col
         return col.apply(format_currency)
 
     return df.apply(format_column)
 
 def format_panda(df):
-    return tabulate(format_floats(df), headers='keys', tablefmt="rounded_outline", showindex=False)
+    return tabulate(format_currencies(df), headers='keys', tablefmt="rounded_outline", showindex=False)
 
 def generate_net_worth_report(accounts):
     open_accounts = accounts[accounts["closed"] == False]
     net_worth = open_accounts["balance"].sum()
     
-    return format_panda(pd.DataFrame({"Net Worth": net_worth}, index=[0], dtype=float))
+    df = pd.DataFrame({"Net Worth": net_worth}, index=[0])
+    
+    return format_panda(df)
 
 if __name__ == "__main__":
     main()
