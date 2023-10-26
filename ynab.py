@@ -7,6 +7,7 @@ import locale
 from prettytable import PrettyTable
 import api
 import pandas as pd
+from tabulate import tabulate
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 logging.basicConfig(format="%(levelname)s: %(message)s")
@@ -84,18 +85,12 @@ def main():
     )
     
     print(generate_net_worth_report(accounts))
-        
-    active_categories = [
-        category for category in categories
-        #if not category.hidden and not category.deleted and
-        if not category.category_group_name in ["Internal Master Category", "Credit Card Payments"]
-    ]
-    
-    category_total, categories_table = generate_categories_report(active_categories)
-    print(categories_table)
     
     account_total, accounts_table = generate_accounts_report(accounts)
     print(accounts_table)
+    
+    category_total, categories_table = generate_categories_report(categories)
+    print(categories_table)
     
     log.debug(f"account_total: {account_total}")
     log.debug(f"category_total: {category_total}")
@@ -142,50 +137,57 @@ def generate_term_report(active_categories):
     print(breakdown_by_terms) """
 
 def generate_accounts_report(accounts):
-    account_total = Decimal(0)
+    open_accounts = accounts[accounts["closed"] == False]
+    
+    account_total = open_accounts["balance"].sum()
+    
     accounts_table = PrettyTable(["Name", "Balance", "Term"])
-    for account in accounts:
+    """ for account in accounts:
         accounts_table.add_row([
-            account.name,
+            account["name"],
             locale.currency(account.balance, grouping=True),
-            account.term,
-        ])
-        account_total += account.balance
-    return account_total,accounts_table
+            account["term"],
+        ]) """
+        
+    return account_total, accounts_table
 
 def generate_categories_report(categories):
+    active_categories = categories[
+        ~categories["name"].isin(["Internal Master Category", "Credit Card Payments"])
+    ]
+    
     category_total = Decimal(0)
     categories_table = PrettyTable(["Name", "Balance", "Term"])
-    for category in categories:
+    for category in active_categories:
         categories_table.add_row([
-            category.name,
-            locale.currency(category.balance, grouping=True),
-            category.term,
+            category["name"],
+            locale.currency(category["balance"], grouping=True),
+            category["term"],
         ])
-        category_total += category.balance
+        category_total += category["balance"]
         
     return category_total,categories_table
 
+def format_currency(float):
+    return locale.currency(float, grouping=True)
+
+def format_floats(df):
+    """Replaces all float columns with string columns formatted to 6 decimal places"""
+    def format_column(col):
+        if col.dtype != float:
+            return col
+        return col.apply(format_currency)
+
+    return df.apply(format_column)
+
+def format_panda(df):
+    return tabulate(format_floats(df), headers='keys', tablefmt="rounded_outline", showindex=False)
+
 def generate_net_worth_report(accounts):
-    open_accounts = accounts[
-        (accounts["closed"] == False) &
-        (accounts["name"].isin(["Pension", "Student Loan"]))
-    ]
+    open_accounts = accounts[accounts["closed"] == False]
+    net_worth = open_accounts["balance"].sum()
     
-    term_totals = {term: Decimal(0) for term in _terms}
-    account_names_by_term = {term: [] for term in _terms}
-    for account in open_accounts:
-        term_totals[account.term] += account.balance
-        account_names_by_term[account.term].append(account.name)
-    
-    account_total = Decimal(0)
-    for term_total in term_totals.values():
-        account_total += term_total
-        
-    net_worth = PrettyTable(["Net Worth"])
-    net_worth.add_row([locale.currency(account_total, grouping=True)])
-    
-    return net_worth
+    return format_panda(pd.DataFrame({"Net Worth": net_worth}, index=[0], dtype=float))
 
 if __name__ == "__main__":
     main()
