@@ -3,10 +3,10 @@ from decimal import Decimal
 import re
 import os
 import json
-from typing import Any, Dict, List, Protocol, Sequence
+from typing import Any, Dict, List, Protocol
 from datetime import datetime, timedelta
 import jsonpickle
-from requests import exceptions, auth, Session
+from requests import auth, Session
 import requests_cache
 import logging
 import locale
@@ -19,6 +19,7 @@ log.setLevel(logging.INFO)
 _CACHE_DIR_PATH = ".cache"
 _REQUEST_CACHE_FILE_NAME = "requests"
 _DELTA_CACHE_FILE = "delta.json"
+_REQUEST_CACHE_EXPIRY_SECONDS = 30
 
 def milliunits_to_centiunits(num) -> int:
     centiunit = num / int(10)
@@ -212,7 +213,7 @@ class Client():
             
             self.session = requests_cache.CachedSession(
                 cache_name=os.path.join(_CACHE_DIR_PATH, _REQUEST_CACHE_FILE_NAME),
-                expire_after=30,
+                expire_after=_REQUEST_CACHE_EXPIRY_SECONDS,
             )
             self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE))
         else:
