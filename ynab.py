@@ -265,7 +265,49 @@ def format_panda(df: pd.DataFrame, total_row: str=""):
     df = format_currencies(df)
     df = format_enums(df)
     
-    return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=False) # type: ignore
+    if total_row:
+        raw_df = [df.columns.values.tolist()] + df.values.tolist()
+        raw_df.append(SEPARATING_LINE)
+        raw_df[-1], raw_df[-2] = raw_df[-2], raw_df[-1]
+        return tabulate(raw_df, headers="firstrow", showindex=False)
+    
+    return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=False)
+
+def report_net_worth(accounts: pd.DataFrame):
+    open_accounts = accounts[accounts["closed"] == False]
+    
+    net_worth_total = open_accounts["balance"].sum()
+    net_worth = pd.DataFrame({"Net Worth": net_worth_total}, index=[0])
+    
+    return format_panda(net_worth)
+
+def report_term_distribution(accounts: pd.DataFrame, categories: pd.DataFrame):
+    open_accounts = accounts[
+        (accounts["closed"] == False) &
+        (accounts["on budget"] == True)
+    ]
+    accounts_by_term = open_accounts.groupby("term").sum()
+    accounts_by_term = accounts_by_term[["balance"]]
+    accounts_by_term = accounts_by_term.rename(columns={"balance": "account balance"})
+    
+    active_categories = categories[
+        (categories["hidden"] == False) &
+        (~categories["category group name"].isin(["Internal Master Category", "Credit Card Payments"]))
+    ]
+    categories_by_term = active_categories.groupby("term").sum()
+    categories_by_term = categories_by_term[["balance"]]
+    categories_by_term = categories_by_term.rename(columns={"balance": "category balance"})
+    
+    term_distribution = accounts_by_term.join(categories_by_term)
+    term_distribution = term_distribution.reset_index()
+    term_distribution = term_distribution.sort_values("term", ascending=False)
+    term_distribution["redistribute"] = term_distribution.apply(lambda row: row["category balance"] - row["account balance"], axis=1)
+    term_distribution["term"] = term_distribution["term"].apply(str.title)
+    
+    """ print(format_panda(open_accounts))
+    print(format_panda(active_categories)) """
+    
+    return format_panda(term_distribution, total_row="term")
 
 if __name__ == "__main__":
     main()
