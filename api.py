@@ -19,7 +19,7 @@ log.setLevel(logging.INFO)
 _CACHE_DIR_PATH = ".cache"
 _REQUEST_CACHE_FILE_NAME = "requests"
 _DELTA_CACHE_FILE = "delta.json"
-_REQUEST_CACHE_EXPIRY_SECONDS = 30
+_REQUEST_CACHE_EXPIRY_SECONDS = 600
 
 def milliunits_to_centiunits(num) -> int:
     centiunit = num / int(10)

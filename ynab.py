@@ -76,22 +76,18 @@ def main():
         categories = client.get_categories(budget_id=budget.id)
         
     accounts = pd.DataFrame([ account.as_dict() for account in accounts ])
-    accounts.sort_values("name")
+    accounts = accounts.sort_values("name")
     
     categories = pd.DataFrame([ category.as_dict() for category in categories ])
-    categories.sort_values(
+    categories = categories.sort_values(
         by=["name", "balance", "term"],
         ascending=[True, True, False]
     )
     
-    print(generate_net_worth_report(accounts))
+    print(report_net_worth(accounts))
+    print(report_term_distribution(accounts, categories))
+    
     return
-    
-    account_total, accounts_table = generate_accounts_report(accounts)
-    print(accounts_table)
-    
-    category_total, categories_table = generate_categories_report(categories)
-    print(categories_table)
     
     log.debug(f"account_total: {account_total}")
     log.debug(f"category_total: {category_total}")
@@ -137,38 +133,6 @@ def generate_term_report(active_categories):
         ])
     print(breakdown_by_terms) """
 
-def generate_accounts_report(accounts):
-    open_accounts = accounts[accounts["closed"] == False]
-    
-    account_total = open_accounts["balance"].sum()
-    
-    accounts_table = PrettyTable(["Name", "Balance", "Term"])
-    """ for account in accounts:
-        accounts_table.add_row([
-            account["name"],
-            locale.currency(account.balance, grouping=True),
-            account["term"],
-        ]) """
-        
-    return account_total, accounts_table
-
-def generate_categories_report(categories):
-    active_categories = categories[
-        ~categories["name"].isin(["Internal Master Category", "Credit Card Payments"])
-    ]
-    
-    category_total = Decimal(0)
-    categories_table = PrettyTable(["Name", "Balance", "Term"])
-    for category in active_categories:
-        categories_table.add_row([
-            category["name"],
-            locale.currency(category["balance"], grouping=True),
-            category["term"],
-        ])
-        category_total += category["balance"]
-        
-    return category_total,categories_table
-
 def format_currency(centiunit):
     unit = centiunit / 100
     return locale.currency(unit, grouping=True)
@@ -186,13 +150,31 @@ def format_panda(df):
     df.columns = map(str.title, df.columns)
     return tabulate(format_currencies(df), headers='keys', tablefmt="rounded_outline", showindex=False)
 
-def generate_net_worth_report(accounts):
+def report_net_worth(accounts: pd.DataFrame):
     open_accounts = accounts[accounts["closed"] == False]
-    net_worth = open_accounts["balance"].sum()
     
-    df = pd.DataFrame({"Net Worth": net_worth}, index=[0])
+    net_worth_total = open_accounts["balance"].sum()
+    net_worth = pd.DataFrame({"Net Worth": net_worth_total}, index=[0])
     
-    return format_panda(df)
+    return format_panda(net_worth)
+
+def report_term_distribution(accounts: pd.DataFrame, categories: pd.DataFrame):
+    open_accounts = accounts[accounts["closed"] == False]
+    accounts_by_term = open_accounts.groupby("term").sum()
+    accounts_by_term = accounts_by_term[["balance"]]
+    accounts_by_term = accounts_by_term.rename(columns={"balance": "account balance"})
+    
+    active_categories = categories[~categories["name"].isin(["Internal Master Category", "Credit Card Payments"])]
+    categories_by_term = active_categories.groupby("term").sum()
+    categories_by_term = categories_by_term[["balance"]]
+    categories_by_term = categories_by_term.rename(columns={"balance": "category balance"})
+    
+    term_distribution = accounts_by_term.join(categories_by_term)
+    term_distribution = term_distribution.reset_index()
+    term_distribution = term_distribution.sort_values("term", ascending=False)
+    term_distribution["term"] = term_distribution["term"].apply(str.title)
+    
+    return format_panda(term_distribution)
 
 if __name__ == "__main__":
     main()
