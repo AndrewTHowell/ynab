@@ -105,10 +105,10 @@ def format_panda(df: pd.DataFrame, total_row: str=""):
         totals[total_row] = "Total"
         df = pd.concat([df, totals], ignore_index=True)
         
-    df.columns = map(str.title, df.columns)
+    df.columns = map(str.title, df.columns) # type: ignore
     df = format_currencies(df)
     
-    return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=False)
+    return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=False) # type: ignore
 
 def report_net_worth(accounts: pd.DataFrame):
     open_accounts = accounts[accounts["closed"] == False]
