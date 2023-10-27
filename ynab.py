@@ -4,10 +4,9 @@ import json
 import logging
 import os
 import locale
-from prettytable import PrettyTable
 import api
 import pandas as pd
-from tabulate import tabulate
+from tabulate import tabulate, SEPARATING_LINE
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 logging.basicConfig(format="%(levelname)s: %(message)s")
@@ -80,64 +79,18 @@ def main():
     
     categories = pd.DataFrame([ category.as_dict() for category in categories ])
     categories = categories.sort_values(
-        by=["name", "balance", "term"],
-        ascending=[True, True, False]
+        by=["term", "balance", "name"],
+        ascending=[False, True, True]
     )
     
     print(report_net_worth(accounts))
     print(report_term_distribution(accounts, categories))
-    
-    return
-    
-    log.debug(f"account_total: {account_total}")
-    log.debug(f"category_total: {category_total}")
-    log.debug(f"account_total - category_total: {account_total - category_total}")
-    
-    #generate_term_report(active_categories)
-
-def generate_term_report(active_categories):
-    categories_by_term = {}
-    for category in active_categories:
-        if category.term not in categories_by_term:
-            categories_by_term[category.term] = []
-        categories_by_term[category.term].append(category)
-        
-    term_balances = { term: Decimal(0) for term in categories_by_term.keys() }
-    for term, categories in categories_by_term.items():
-        for category in categories:
-            term_balances[term] += category.balance
-    
-    """ term_total_diff = {
-        term: {
-            "diff": term_totals[term],# - target_term_totals[term],
-            #"target": target_term_totals[term],
-            "actual": term_totals[term]
-        }
-        for term in _terms# if term_totals[term] - target_term_totals[term] != 0
-    }
-    breakdown_by_terms = PrettyTable(["Term", "Target Total", "Actual Total", "Action"])
-    for term, term_total in term_total_diff.items():
-        diff = term_total["diff"] 
-        target_total = term_total["target"]
-        actual_total = term_total["actual"]
-        operand = "more"
-        if diff > 0:
-            operand = "less"
-        diff = abs(diff)
-        diff = round(diff, -2) # Round to nearest 100
-        breakdown_by_terms.add_row([
-            term.capitalize(),
-            locale.currency(target_total, grouping=True),
-            locale.currency(actual_total, grouping=True),
-            f"Needs ~{locale.currency(diff, grouping=True)} {operand}"
-        ])
-    print(breakdown_by_terms) """
 
 def format_currency(centiunit):
     unit = centiunit / 100
     return locale.currency(unit, grouping=True)
 
-def format_currencies(df):
+def format_currencies(df: pd.DataFrame):
     """Replaces all int columns with formatted string columns"""
     def format_column(col):
         if col.dtype != int:
@@ -146,9 +99,23 @@ def format_currencies(df):
 
     return df.apply(format_column)
 
-def format_panda(df):
+def format_panda(df: pd.DataFrame, total_row: str=""):
+    if total_row:
+        totals = pd.DataFrame([df.apply(pd.to_numeric, errors="coerce").fillna("").sum()])
+        totals[total_row] = "Total"
+        df = pd.concat([df, totals], ignore_index=True)
+        
     df.columns = map(str.title, df.columns)
-    return tabulate(format_currencies(df), headers='keys', tablefmt="rounded_outline", showindex=False)
+    df = format_currencies(df)
+    
+    """ Attempting to add separator row before total
+    if total_row:
+        raw_df = [df.columns.values.tolist()] + df.values.tolist()
+        raw_df.append(SEPARATING_LINE)
+        raw_df[-1], raw_df[-2] = raw_df[-2], raw_df[-1]
+        return tabulate(raw_df, headers="firstrow", showindex=False) """
+    
+    return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=False)
 
 def report_net_worth(accounts: pd.DataFrame):
     open_accounts = accounts[accounts["closed"] == False]
@@ -159,12 +126,18 @@ def report_net_worth(accounts: pd.DataFrame):
     return format_panda(net_worth)
 
 def report_term_distribution(accounts: pd.DataFrame, categories: pd.DataFrame):
-    open_accounts = accounts[accounts["closed"] == False]
+    open_accounts = accounts[
+        (accounts["closed"] == False) &
+        (accounts["on budget"] == True)
+    ]
     accounts_by_term = open_accounts.groupby("term").sum()
     accounts_by_term = accounts_by_term[["balance"]]
     accounts_by_term = accounts_by_term.rename(columns={"balance": "account balance"})
     
-    active_categories = categories[~categories["name"].isin(["Internal Master Category", "Credit Card Payments"])]
+    active_categories = categories[
+        (categories["hidden"] == False) &
+        (~categories["category group name"].isin(["Internal Master Category"]))
+    ]
     categories_by_term = active_categories.groupby("term").sum()
     categories_by_term = categories_by_term[["balance"]]
     categories_by_term = categories_by_term.rename(columns={"balance": "category balance"})
@@ -172,9 +145,13 @@ def report_term_distribution(accounts: pd.DataFrame, categories: pd.DataFrame):
     term_distribution = accounts_by_term.join(categories_by_term)
     term_distribution = term_distribution.reset_index()
     term_distribution = term_distribution.sort_values("term", ascending=False)
+    term_distribution["redistribute"] = term_distribution.apply(lambda row: row["category balance"] - row["account balance"], axis=1)
     term_distribution["term"] = term_distribution["term"].apply(str.title)
     
-    return format_panda(term_distribution)
+    print(format_panda(open_accounts))
+    print(format_panda(active_categories))
+    
+    return format_panda(term_distribution, total_row="term")
 
 if __name__ == "__main__":
     main()
