@@ -108,13 +108,6 @@ def format_panda(df: pd.DataFrame, total_row: str=""):
     df.columns = map(str.title, df.columns)
     df = format_currencies(df)
     
-    """ Attempting to add separator row before total
-    if total_row:
-        raw_df = [df.columns.values.tolist()] + df.values.tolist()
-        raw_df.append(SEPARATING_LINE)
-        raw_df[-1], raw_df[-2] = raw_df[-2], raw_df[-1]
-        return tabulate(raw_df, headers="firstrow", showindex=False) """
-    
     return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=False)
 
 def report_net_worth(accounts: pd.DataFrame):
