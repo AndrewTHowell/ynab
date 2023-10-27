@@ -75,6 +75,9 @@ class Budget:
         
         self.id = budget_json["id"]
         self.name = budget_json["name"]
+    
+    def as_dict(self):
+        return {"id": self.id, "name": self.name}
 
     def __str__(self):
         return self.name
