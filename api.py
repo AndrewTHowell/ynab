@@ -158,10 +158,12 @@ class DeltaCacheItem():
         self.data = data
         
 class DeltaCache(dict):
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, flush_cache: bool):
         super(DeltaCache, self).__init__()
         self._file_path = file_path
-        self.load_from_file()
+        
+        if not flush_cache:
+            self.load_from_file()
                 
     def load_from_file(self):
         if os.path.exists(self._file_path):
@@ -208,22 +210,21 @@ class Client():
     _budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
     
-    def __init__(self, auth_token: str, cache: bool):
+    def __init__(self, auth_token: str, flush_cache: bool, cache_ttl=_REQUEST_CACHE_EXPIRY_SECONDS):
         self.auth = BearerAuth(auth_token)
         
-        if cache:
-            if not os.path.exists(_CACHE_DIR_PATH):
-                os.makedirs(_CACHE_DIR_PATH)
+        if not os.path.exists(_CACHE_DIR_PATH):
+            os.makedirs(_CACHE_DIR_PATH)
+        
+        self.session = requests_cache.CachedSession(
+            cache_name=os.path.join(_CACHE_DIR_PATH, _REQUEST_CACHE_FILE_NAME),
+            expire_after=cache_ttl,
+        )
+        if flush_cache:
+            self.session.cache.clear()
             
-            self.session = requests_cache.CachedSession(
-                cache_name=os.path.join(_CACHE_DIR_PATH, _REQUEST_CACHE_FILE_NAME),
-                expire_after=_REQUEST_CACHE_EXPIRY_SECONDS,
-            )
-            self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE))
-        else:
-            self.session = Session()
-            self.cache = None
-     
+        self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE), flush_cache=flush_cache)
+        
     def __enter__(self):
         return self
  

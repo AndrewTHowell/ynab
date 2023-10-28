@@ -33,17 +33,17 @@ def main():
         description="Script for consuming and processing YNAB data.",
     )
     parser.add_argument(
-        "-cf", "--config_file_path",
+        "-c", "--config_file_path",
         help="The path to the configuration for this script.",
         type=valid_file_path,
         required=True,
         dest="config_file_path",
     )
     parser.add_argument(
-        "-ca", "--cache",
-        help="Turn on API caching.",
+        "-f", "--flush_cache",
+        help="Flush the cache.",
         action='store_true',
-        dest="cache"
+        dest="flush_cache",
     )
     parser.add_argument(
         "-d", "--debug",
@@ -64,12 +64,15 @@ def main():
     auth_token = config["auth_token"]
     log.debug(f"auth_token: {auth_token}")
     
+    cache_ttl = config["cache_ttl"]
+    log.debug(f"cache_ttl: {cache_ttl}")
+    
     budget_name = ""
     if "budget_name" in config:
         budget_name = config["budget_name"]
     log.debug(f"budget_name: {budget_name}")
     
-    with api.Client(auth_token=auth_token, cache=args.cache) as client:       
+    with api.Client(auth_token=auth_token, flush_cache=args.flush_cache, cache_ttl=cache_ttl) as client:       
         budget = client.get_last_used_budget()         
         accounts = client.get_accounts(budget_id=budget.id)
         categories = client.get_categories(budget_id=budget.id)
