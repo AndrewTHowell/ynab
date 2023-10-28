@@ -12,20 +12,23 @@ locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 logging.basicConfig(format="%(levelname)s: %(message)s")
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
-
-""" 
-_terms defines what terms accounts/categories can be classed as.
-
-Short: 0-3 months
-Medium: 3 months - 5 years
-Long: 5+ years
-"""
-_terms = ["short", "medium", "long"]
     
 def valid_file_path(file_path: str):
     if not os.path.exists(file_path):
         raise argparse.ArgumentTypeError
     return file_path
+
+class Config():
+    def __init__(self, file_path: str):        
+        with open(file_path) as f:
+            config_json = json.load(f)
+
+            self.auth_token = config_json["auth_token"]
+            self.cache_ttl = config_json["cache_ttl"]
+            
+            log.debug(f"auth_token: {self.auth_token}")
+            log.debug(f"cache_ttl: {self.cache_ttl}")
+        
 
 def main():
     parser = argparse.ArgumentParser(
@@ -56,23 +59,9 @@ def main():
     if args.debug:
         log.setLevel(logging.DEBUG)
     
-    config_file_path = args.config_file_path
+    config = Config(args.config_file_path)
     
-    with open(config_file_path) as f:
-        config = json.load(f)
-
-    auth_token = config["auth_token"]
-    log.debug(f"auth_token: {auth_token}")
-    
-    cache_ttl = config["cache_ttl"]
-    log.debug(f"cache_ttl: {cache_ttl}")
-    
-    budget_name = ""
-    if "budget_name" in config:
-        budget_name = config["budget_name"]
-    log.debug(f"budget_name: {budget_name}")
-    
-    with api.Client(auth_token=auth_token, flush_cache=args.flush_cache, cache_ttl=cache_ttl) as client:       
+    with api.Client(auth_token=config.auth_token, flush_cache=args.flush_cache, cache_ttl=config.cache_ttl) as client:
         budget = client.get_last_used_budget()         
         accounts = client.get_accounts(budget_id=budget.id)
         categories = client.get_categories(budget_id=budget.id)
