@@ -141,9 +141,6 @@ def report_term_distribution(accounts: pd.DataFrame, categories: pd.DataFrame):
     term_distribution["redistribute"] = term_distribution.apply(lambda row: row["category balance"] - row["account balance"], axis=1)
     term_distribution["term"] = term_distribution["term"].apply(str.title)
     
-    """ print(format_panda(open_accounts))
-    print(format_panda(active_categories)) """
-    
     return format_panda(term_distribution, total_row="term")
 
 if __name__ == "__main__":
