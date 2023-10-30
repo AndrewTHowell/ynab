@@ -195,10 +195,9 @@ class Category:
     def as_dict(self):
         return {
             "id": self.id, "name": self.name, "balance": self.balance, "term": self.term,
-            "category group name": self.category_group_name, "goal_type": self.goal_type.value,
-            "goal_target_month": self.goal_target_month,"goal_months_to_budget": self.goal_months_to_budget,
-            "goal_cadence": self.goal_cadence.value, "goal_cadence_frequency": self.goal_cadence_frequency,
-            "hidden": self.hidden, "deleted": self.deleted,
+            "category group name": self.category_group_name, "goal type": self.goal_type.value,
+            "goal target month": self.goal_target_month,"goal cadence": self.goal_cadence.value,
+            "goal cadence frequency": self.goal_cadence_frequency, "hidden": self.hidden, "deleted": self.deleted,
         }
 
     def __str__(self):
