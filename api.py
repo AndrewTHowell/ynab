@@ -40,9 +40,11 @@ class Account:
         
         self.id = account_json["id"]
         self.name = account_json["name"]
+        # TODO: use an enum for this
         self.type = account_json["type"]
         self.on_budget = account_json["on_budget"]
         self.balance = milliunits_to_centiunits(account_json["balance"])
+        # TODO: use an enum for this
         self.term = self.get_term(account_json["note"])
         self.closed = account_json["closed"]
 
@@ -161,6 +163,7 @@ class Category:
             self.goal_target_month = datetime.strptime(goal_target_month_str, "%Y-%m-%d").date()
         
     def set_term(self):
+        # TODO: use an enum for this
         if self.goal_type != CategoryGoalType.none:
             if self.goal_type == CategoryGoalType.target_balance or self.goal_type == CategoryGoalType.monthly_funding:
                 self.term = "Medium"
@@ -193,6 +196,7 @@ class Category:
         self.term = "Long"
     
     def as_dict(self):
+        # TODO: use direct enums in dict repr. Could add __repr__ to enum classes? That would mean they'd still be enum typed but show just the value
         return {
             "id": self.id, "name": self.name, "balance": self.balance, "term": self.term,
             "category group name": self.category_group_name, "goal type": self.goal_type.value,

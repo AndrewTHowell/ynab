@@ -155,6 +155,7 @@ class YNAB:
         
         return format_panda(net_worth)
 
+    # TODO: fix this given the new columns
     def report_term_distribution(self):
         accounts = self.accounts.copy(deep=True)
         categories = self.categories.copy(deep=True)
