@@ -75,8 +75,9 @@ def main():
         ascending=[False, True, True]
     )
     
-    print(report_net_worth(accounts))
-    print(report_term_distribution(accounts, categories))
+    #print(report_net_worth(accounts))
+    #print(report_term_distribution(accounts, categories))
+    print(report_rollover(categories))
 
 def format_currency(centiunit):
     unit = centiunit / 100
@@ -134,6 +135,21 @@ def report_term_distribution(accounts: pd.DataFrame, categories: pd.DataFrame):
     term_distribution["term"] = term_distribution["term"].apply(str.title)
     
     return format_panda(term_distribution, total_row="term")
+
+def report_rollover(categories: pd.DataFrame):
+    categories_that_rollover = categories[
+        (categories["hidden"] == False) &
+        (categories["goal_type"] == api.CategoryGoalType.needed_for_spending.value) &
+        (
+            (categories["goal_cadence"] == api.CategoryGoalCadence.weekly.value) |
+            (categories["goal_cadence"] == api.CategoryGoalCadence.monthly.value)
+        )
+    ]
+    
+    rollover_total = categories_that_rollover["balance"].sum()
+    rollover = pd.DataFrame({"Rollover Balance": rollover_total}, index=[0])
+    
+    return format_panda(rollover)
 
 if __name__ == "__main__":
     main()
