@@ -1,12 +1,13 @@
 import argparse
-from decimal import Decimal
 import json
 import logging
 import os
 import locale
 import api
 import pandas as pd
-from tabulate import tabulate, SEPARATING_LINE
+from tabulate import tabulate
+from simple_term_menu import TerminalMenu
+import random
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 logging.basicConfig(format="%(levelname)s: %(message)s")
@@ -61,23 +62,142 @@ def main():
     
     config = Config(args.config_file_path)
     
-    with api.Client(auth_token=config.auth_token, flush_cache=args.flush_cache, cache_ttl=config.cache_ttl) as client:
-        budget = client.get_last_used_budget()         
-        accounts = client.get_accounts(budget_id=budget.id)
-        categories = client.get_categories(budget_id=budget.id)
+    YNAB(config, args.flush_cache)
+    
+class YNAB:
+    def __init__(self, config, flush_cache):
+        self.auth_token = config.auth_token
+        self.cache_ttl = config.cache_ttl        
+        self.load_data(flush_cache)
         
-    accounts = pd.DataFrame([ account.as_dict() for account in accounts ])
-    accounts = accounts.sort_values("name")
+        self.main_menu()
     
-    categories = pd.DataFrame([ category.as_dict() for category in categories ])
-    categories = categories.sort_values(
-        by=["term", "balance", "name"],
-        ascending=[False, True, True]
-    )
+    def main_menu(self):
+        while True:
+            options = [
+                "[n] Net Worth",
+                "[t] Term Distribution",
+                "[r] Rollover Balance",
+                "[d] Data",
+                "[e] Exit"
+            ]
+            terminal_menu = TerminalMenu(options, title="Main Menu")
+            choice = terminal_menu.show()
+            
+            match choice:
+                case 0:
+                    print(self.report_net_worth())
+                case 1:
+                    print(self.report_term_distribution())
+                case 2:
+                    print(self.report_rollover())
+                case 3:
+                    self.data_menu()
+                case _:
+                    number_of_e = random.randrange(2, 10)
+                    print(f"Y{'e'*number_of_e}t")
+                    break
     
-    #print(report_net_worth(accounts))
-    #print(report_term_distribution(accounts, categories))
-    print(report_rollover(categories))
+    def data_menu(self):
+        while True:
+            options = [
+                "[a] Accounts",
+                "[c] Categories",
+                "[r] Refresh Data",
+                "[b] Back"
+            ]
+            terminal_menu = TerminalMenu(options, title="Data Menu")
+            choice = terminal_menu.show()
+            
+            match choice:
+                case 0:
+                    print(self.report_accounts())
+                case 1:
+                    print(self.report_categories())
+                case 2:
+                    self.load_data(True)
+                case _:
+                    break
+                
+    
+    def load_data(self, flush_cache):
+        with api.Client(auth_token=self.auth_token, cache_ttl=self.cache_ttl, flush_cache=flush_cache) as client:
+            budget = client.get_last_used_budget()         
+            accounts = client.get_accounts(budget_id=budget.id)
+            categories = client.get_categories(budget_id=budget.id)
+            
+        accounts = pd.DataFrame([ account.as_dict() for account in accounts ])
+        self.accounts = accounts.sort_values("name")
+        
+        categories = pd.DataFrame([ category.as_dict() for category in categories ])
+        self.categories = categories.sort_values(
+            by=["term", "balance", "name"],
+            ascending=[False, True, True]
+        )
+
+    def report_accounts(self):
+        accounts = self.accounts.copy(deep=True)
+        return format_panda(accounts)
+
+    def report_categories(self):
+        categories = self.categories.copy(deep=True)
+        return format_panda(categories)
+
+    def report_net_worth(self):
+        accounts = self.accounts.copy(deep=True)
+        
+        print(f"accounts.tail(): {accounts.tail()}")
+        
+        open_accounts = accounts[accounts["closed"] == False]
+        
+        net_worth_total = open_accounts["balance"].sum()
+        net_worth = pd.DataFrame({"Net Worth": net_worth_total}, index=[0])
+        
+        return format_panda(net_worth)
+
+    def report_term_distribution(self):
+        accounts = self.accounts.copy(deep=True)
+        categories = self.categories.copy(deep=True)
+        
+        open_accounts = accounts[
+            (accounts["closed"] == False) &
+            (accounts["on budget"] == True)
+        ]
+        accounts_by_term = open_accounts.groupby("term").sum()
+        accounts_by_term = accounts_by_term[["balance"]]
+        accounts_by_term = accounts_by_term.rename(columns={"balance": "account balance"})
+        
+        active_categories = categories[
+            (categories["hidden"] == False) &
+            (~categories["category group name"].isin(["Internal Master Category", "Credit Card Payments"]))
+        ]
+        categories_by_term = active_categories.groupby("term").sum()
+        categories_by_term = categories_by_term[["balance"]]
+        categories_by_term = categories_by_term.rename(columns={"balance": "category balance"})
+        
+        term_distribution = accounts_by_term.join(categories_by_term)
+        term_distribution = term_distribution.reset_index()
+        term_distribution = term_distribution.sort_values("term", ascending=False)
+        term_distribution["redistribute"] = term_distribution.apply(lambda row: row["category balance"] - row["account balance"], axis=1)
+        
+        return format_panda(term_distribution, total_row="term")
+
+    def report_rollover(self):
+        categories = self.categories.copy(deep=True)
+        
+        categories_that_rollover = categories[
+            (categories["hidden"] == False) &
+            (categories["goal type"] == api.CategoryGoalType.needed_for_spending.value) &
+            (
+                (categories["goal cadence"] == api.CategoryGoalCadence.weekly.value) |
+                (categories["goal cadence"] == api.CategoryGoalCadence.monthly.value)
+            )
+        ]
+        
+        rollover_total = categories_that_rollover["balance"].sum()
+        rollover = pd.DataFrame({"Rollover Balance": rollover_total}, index=[0])
+        
+        return format_panda(rollover)
 
 def format_currency(centiunit):
     unit = centiunit / 100
@@ -102,54 +222,6 @@ def format_panda(df: pd.DataFrame, total_row: str=""):
     df = format_currencies(df)
     
     return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=False) # type: ignore
-
-def report_net_worth(accounts: pd.DataFrame):
-    open_accounts = accounts[accounts["closed"] == False]
-    
-    net_worth_total = open_accounts["balance"].sum()
-    net_worth = pd.DataFrame({"Net Worth": net_worth_total}, index=[0])
-    
-    return format_panda(net_worth)
-
-def report_term_distribution(accounts: pd.DataFrame, categories: pd.DataFrame):
-    open_accounts = accounts[
-        (accounts["closed"] == False) &
-        (accounts["on budget"] == True)
-    ]
-    accounts_by_term = open_accounts.groupby("term").sum()
-    accounts_by_term = accounts_by_term[["balance"]]
-    accounts_by_term = accounts_by_term.rename(columns={"balance": "account balance"})
-    
-    active_categories = categories[
-        (categories["hidden"] == False) &
-        (~categories["category group name"].isin(["Internal Master Category", "Credit Card Payments"]))
-    ]
-    categories_by_term = active_categories.groupby("term").sum()
-    categories_by_term = categories_by_term[["balance"]]
-    categories_by_term = categories_by_term.rename(columns={"balance": "category balance"})
-    
-    term_distribution = accounts_by_term.join(categories_by_term)
-    term_distribution = term_distribution.reset_index()
-    term_distribution = term_distribution.sort_values("term", ascending=False)
-    term_distribution["redistribute"] = term_distribution.apply(lambda row: row["category balance"] - row["account balance"], axis=1)
-    term_distribution["term"] = term_distribution["term"].apply(str.title)
-    
-    return format_panda(term_distribution, total_row="term")
-
-def report_rollover(categories: pd.DataFrame):
-    categories_that_rollover = categories[
-        (categories["hidden"] == False) &
-        (categories["goal_type"] == api.CategoryGoalType.needed_for_spending.value) &
-        (
-            (categories["goal_cadence"] == api.CategoryGoalCadence.weekly.value) |
-            (categories["goal_cadence"] == api.CategoryGoalCadence.monthly.value)
-        )
-    ]
-    
-    rollover_total = categories_that_rollover["balance"].sum()
-    rollover = pd.DataFrame({"Rollover Balance": rollover_total}, index=[0])
-    
-    return format_panda(rollover)
 
 if __name__ == "__main__":
     main()
