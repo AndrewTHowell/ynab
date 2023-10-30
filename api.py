@@ -56,7 +56,7 @@ class Account:
             return ""
         
         term = match.group(0)
-        return term.split()[0].lower()
+        return term.split()[0].title()
     
     def as_dict(self):
         return {
@@ -116,7 +116,7 @@ class Category:
         self.goal_months_to_budget = category_json["goal_months_to_budget"]
         self.set_goal_type(category_json["goal_type"])
         self.set_goal_target_month(category_json["goal_target_month"])
-        self._set_term()
+        self.set_term()
         
     def set_cadence(self, cadence: int):
         match cadence:
@@ -160,37 +160,37 @@ class Category:
         if goal_target_month_str:
             self.goal_target_month = datetime.strptime(goal_target_month_str, "%Y-%m-%d").date()
         
-    def _set_term(self):
+    def set_term(self):
         if self.goal_type != CategoryGoalType.none:
             if self.goal_type == CategoryGoalType.target_balance or self.goal_type == CategoryGoalType.monthly_funding:
-                self.term = "medium"
+                self.term = "Medium"
                 return
             
         if self.goal_months_to_budget:
             if self.goal_months_to_budget <= 3:
-                self.term = "short"
+                self.term = "Short"
                 return
             if self.goal_months_to_budget <= 5*12:
-                self.term = "medium"
+                self.term = "Medium"
                 return
             
         if self.goal_target_month:
             if self.goal_target_month <= datetime.today().date() + timedelta(days=3*30):
-                self.term = "short"
+                self.term = "Short"
                 return
             if self.goal_target_month <= datetime.today().date() + timedelta(days=5*365):
-                self.term = "medium"
+                self.term = "Medium"
                 return
             
         if self.category_group_name:
             if self.category_group_name == "Credit Card Payments":
-                self.term = "short"
+                self.term = "Short"
                 return
             
         if self.name == "Amex Membership":
-            self.term = "medium"
+            self.term = "Medium"
             
-        self.term = "long"
+        self.term = "Long"
     
     def as_dict(self):
         return {
@@ -333,7 +333,7 @@ class Client():
         if not self.cache is None:
             self.cache.update_data("accounts", resp_data["server_knowledge"], accounts)
             
-        return accounts  
+        return accounts
        
     def get_categories(self, budget_id: str) -> List[Category]:  
         server_knowledge = None
@@ -350,4 +350,4 @@ class Client():
         if not self.cache is None:
             self.cache.update_data("categories", resp_data["server_knowledge"], categories)
             
-        return categories 
+        return categories
