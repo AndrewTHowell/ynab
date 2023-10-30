@@ -10,6 +10,7 @@ from requests import auth, Session
 import requests_cache
 import logging
 import locale
+from enum import Enum
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 logging.basicConfig(format="%(levelname)s: %(message)s")
@@ -85,7 +86,20 @@ class Budget:
     def __repr__(self):
         return self.__str__()
 
-class Category:
+class CategoryGoalType(Enum):
+    none = "None"
+    needed_for_spending = "Needed For Spending"
+    target_balance = "Target Balance"
+    target_balance_date = "Target Balance by Date"
+    monthly_funding = "Monthly Funding"
+
+class CategoryGoalCadence(Enum):
+    none = ""
+    monthly = "Monthly"
+    weekly = "Weekly"
+    yearly = "Yearly"
+                
+class Category:        
     def __init__(self, category_json: Dict):
         log.debug(f"category_json: {category_json}")
         
@@ -96,34 +110,75 @@ class Category:
         self.hidden = category_json["hidden"]
         self.deleted = category_json["deleted"]
         
-        self._set_term(category_json=category_json)
+        self.set_cadence(category_json["goal_cadence"])
+        self.goal_cadence_frequency = category_json["goal_cadence_frequency"]
         
-    def _set_term(self, category_json: Dict):
-        goal_type = category_json["goal_type"]
-        goal_target_month_str = category_json["goal_target_month"]
-        goal_target_month = None
+        self.goal_months_to_budget = category_json["goal_months_to_budget"]
+        self.set_goal_type(category_json["goal_type"])
+        self.set_goal_target_month(category_json["goal_target_month"])
+        self._set_term()
+        
+    def set_cadence(self, cadence: int):
+        match cadence:
+            case 0:
+                self.goal_cadence = CategoryGoalCadence.none
+            case 1:
+                self.goal_cadence = CategoryGoalCadence.monthly
+            case 2:
+                self.goal_cadence = CategoryGoalCadence.weekly
+            case 13:
+                self.goal_cadence = CategoryGoalCadence.yearly
+            case _:
+                if cadence is None:
+                    self.goal_cadence = CategoryGoalCadence.none
+                else:
+                    # See https://api.ynab.com/v1#/Categories/getCategories schema for definition of goal_cadence
+                    log.error(f"unexpected category goal type: {cadence}, want 0,1,2, or 13. 3-12 are legacy")
+                    raise Exception()
+        
+    def set_goal_type(self, goal_type_str: str):
+        match goal_type_str:
+            case "":
+                self.goal_type = CategoryGoalType.none
+            case "NEED":
+                self.goal_type = CategoryGoalType.needed_for_spending
+            case "TB":
+                self.goal_type = CategoryGoalType.target_balance
+            case "TBD":
+                self.goal_type = CategoryGoalType.target_balance_date
+            case "MF":
+                self.goal_type = CategoryGoalType.monthly_funding
+            case _:
+                if goal_type_str is None:
+                    self.goal_type = CategoryGoalType.none
+                else:
+                    log.error(f"unexpected category goal type: {goal_type_str}")
+                    raise Exception()
+        
+    def set_goal_target_month(self, goal_target_month_str: str):
+        self.goal_target_month = None
         if goal_target_month_str:
-            goal_target_month = datetime.strptime(goal_target_month_str, "%Y-%m-%d").date()
-        goal_months_to_budget = category_json["goal_months_to_budget"]
+            self.goal_target_month = datetime.strptime(goal_target_month_str, "%Y-%m-%d").date()
         
-        if goal_type:
-            if goal_type == "TB" or goal_type == "MF":
+    def _set_term(self):
+        if self.goal_type != CategoryGoalType.none:
+            if self.goal_type == CategoryGoalType.target_balance or self.goal_type == CategoryGoalType.monthly_funding:
                 self.term = "medium"
                 return
             
-        if goal_months_to_budget:
-            if goal_months_to_budget <= 3:
+        if self.goal_months_to_budget:
+            if self.goal_months_to_budget <= 3:
                 self.term = "short"
                 return
-            if goal_months_to_budget <= 5*12:
+            if self.goal_months_to_budget <= 5*12:
                 self.term = "medium"
                 return
             
-        if goal_target_month:
-            if goal_target_month <= datetime.today().date() + timedelta(days=3*30):
+        if self.goal_target_month:
+            if self.goal_target_month <= datetime.today().date() + timedelta(days=3*30):
                 self.term = "short"
                 return
-            if goal_target_month <= datetime.today().date() + timedelta(days=5*365):
+            if self.goal_target_month <= datetime.today().date() + timedelta(days=5*365):
                 self.term = "medium"
                 return
             
@@ -140,7 +195,10 @@ class Category:
     def as_dict(self):
         return {
             "id": self.id, "name": self.name, "balance": self.balance, "term": self.term,
-            "category group name": self.category_group_name, "hidden": self.hidden, "deleted": self.deleted,
+            "category group name": self.category_group_name, "goal_type": self.goal_type.value,
+            "goal_target_month": self.goal_target_month,"goal_months_to_budget": self.goal_months_to_budget,
+            "goal_cadence": self.goal_cadence.value, "goal_cadence_frequency": self.goal_cadence_frequency,
+            "hidden": self.hidden, "deleted": self.deleted,
         }
 
     def __str__(self):
