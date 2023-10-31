@@ -40,8 +40,8 @@ def main():
         "-c", "--config_file_path",
         help="The path to the configuration for this script.",
         type=valid_file_path,
-        required=True,
         dest="config_file_path",
+        default="config.json"
     )
     parser.add_argument(
         "-f", "--flush_cache",
