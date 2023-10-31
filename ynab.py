@@ -146,8 +146,6 @@ class YNAB:
     def report_net_worth(self):
         accounts = self.accounts.copy(deep=True)
         
-        print(f"accounts.tail(): {accounts.tail()}")
-        
         open_accounts = accounts[accounts["closed"] == False]
         
         net_worth_total = open_accounts["balance"].sum()
