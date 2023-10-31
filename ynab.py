@@ -153,7 +153,6 @@ class YNAB:
         
         return format_panda(net_worth)
 
-    # TODO: fix this given the new columns
     def report_term_distribution(self):
         accounts = self.accounts.copy(deep=True)
         categories = self.categories.copy(deep=True)
@@ -162,16 +161,16 @@ class YNAB:
             (accounts["closed"] == False) &
             (accounts["on budget"] == True)
         ]
-        accounts_by_term = open_accounts.groupby("term").sum()
-        accounts_by_term = accounts_by_term[["balance"]]
+        accounts_by_term = open_accounts[["balance", "term"]]
+        accounts_by_term = accounts_by_term.groupby("term").sum()
         accounts_by_term = accounts_by_term.rename(columns={"balance": "account balance"})
         
         active_categories = categories[
             (categories["hidden"] == False) &
             (~categories["category group name"].isin(["Internal Master Category", "Credit Card Payments"]))
         ]
-        categories_by_term = active_categories.groupby("term").sum()
-        categories_by_term = categories_by_term[["balance"]]
+        categories_by_term = active_categories[["balance", "term"]]
+        categories_by_term = categories_by_term.groupby("term").sum()
         categories_by_term = categories_by_term.rename(columns={"balance": "category balance"})
         
         term_distribution = accounts_by_term.join(categories_by_term)
