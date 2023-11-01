@@ -1,6 +1,6 @@
 # YNAB
 
-A CLI tool for performing custom analysis on my You Need A Budget (YNAB) data, as well as viewing the raw data.
+A CLI tool for performing custom analysis on your You Need A Budget (YNAB) data, as well as viewing the raw data.
 
 ## Features
 
