@@ -122,11 +122,9 @@ class YNAB:
                 
     
     def load_data(self, flush_cache):
-        with api.Client(auth_token=self.auth_token, cache_ttl=self.cache_ttl, flush_cache=flush_cache) as client:
-            # TODO: don't get entire budget just for the static `last-used` id
-            budget = client.get_last_used_budget()         
-            accounts = client.get_accounts(budget_id=budget.id)
-            categories = client.get_categories(budget_id=budget.id)
+        with api.Client(auth_token=self.auth_token, cache_ttl=self.cache_ttl, flush_cache=flush_cache) as client:     
+            accounts = client.get_accounts()
+            categories = client.get_categories()
             
         accounts = pd.DataFrame([ account.as_dict() for account in accounts ])
         self.accounts = accounts.sort_values("name")
@@ -193,7 +191,6 @@ class YNAB:
                 (categories["goal cadence"] == api.CategoryGoalCadence.monthly)
             )
         ]
-        print(categories_that_rollover)
         
         rollover_total = categories_that_rollover["balance"].sum()
         rollover = pd.DataFrame({"Rollover Balance": rollover_total}, index=[0])

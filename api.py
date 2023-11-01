@@ -22,6 +22,8 @@ _REQUEST_CACHE_FILE_NAME = "requests"
 _DELTA_CACHE_FILE = "delta.json"
 _REQUEST_CACHE_EXPIRY_SECONDS = 600
 
+LAST_USED_BUDGET_ID="last-used"
+
 def milliunits_to_centiunits(num) -> int:
     centiunit = num / int(10)
     return int(centiunit)
@@ -313,7 +315,7 @@ class Client():
         if not self.cache is None and "budget" in self.cache:
             return self.cache["budget"].data
             
-        resp_data = self.get(self._budget_url.format("last-used"))
+        resp_data = self.get(self._budget_url.format(LAST_USED_BUDGET_ID))
         budget = Budget(resp_data["budget"])
         
         if not self.cache is None:
@@ -321,7 +323,7 @@ class Client():
             
         return budget
 
-    def get_accounts(self, budget_id: str) -> List[Account]:
+    def get_accounts(self, budget_id=LAST_USED_BUDGET_ID) -> List[Account]:
         server_knowledge = None
         if not self.cache is None and "accounts" in self.cache:
             server_knowledge = self.cache["accounts"].server_knowledge
@@ -337,7 +339,7 @@ class Client():
             
         return accounts
        
-    def get_categories(self, budget_id: str) -> List[Category]:  
+    def get_categories(self, budget_id=LAST_USED_BUDGET_ID) -> List[Category]:  
         server_knowledge = None
         if not self.cache is None and "categories" in self.cache:
             server_knowledge = self.cache["categories"].server_knowledge
