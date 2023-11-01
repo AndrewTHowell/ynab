@@ -43,6 +43,7 @@ options:
   - Accounts show where the money is right now, categories show where the money is assigned to be spent
   - Hence, the goal should be to align the distribution of categories in the accounts
   - Final column shows, for each term, whether or not the accounts are under/overfunded
+  - **Note:** for this report to work, all your accounts must have an account note including the substring `<term> Term`
 - Raw data
   - Accounts
   - Categories
