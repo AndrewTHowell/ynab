@@ -9,10 +9,7 @@ import jsonpickle
 from requests import auth
 import requests_cache
 import logging
-import locale
 from enum import Enum
-
-locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 
 _CACHE_DIR_PATH = ".cache"
 _REQUEST_CACHE_FILE_NAME = "requests"
