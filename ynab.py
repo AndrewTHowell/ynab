@@ -11,9 +11,6 @@ import random
 from enum import Enum
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
-logging.basicConfig(format="%(levelname)s: %(message)s")
-log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
     
 def valid_file_path(file_path: str):
     if not os.path.exists(file_path):
@@ -28,8 +25,8 @@ class Config():
             self.auth_token = config_json["auth_token"]
             self.cache_ttl = config_json["cache_ttl"]
             
-            log.debug(f"auth_token: {self.auth_token}")
-            log.debug(f"cache_ttl: {self.cache_ttl}")
+            logging.debug(f"auth_token: {self.auth_token}")
+            logging.debug(f"cache_ttl: {self.cache_ttl}")
         
 
 def main():
@@ -58,8 +55,14 @@ def main():
     )
     args = parser.parse_args()
     
+    log_level = logging.INFO
     if args.debug:
-        log.setLevel(logging.DEBUG)
+        log_level = logging.DEBUG
+        
+    logging.basicConfig(
+        format="%(asctime)s | %(levelname)s | %(module)s:L%(lineno)d > %(message)s",
+        level=log_level,
+    )
     
     config = Config(args.config_file_path)
     

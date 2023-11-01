@@ -13,9 +13,6 @@ import locale
 from enum import Enum
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
-logging.basicConfig(format="%(levelname)s: %(message)s")
-log = logging.getLogger(__name__)
-log.setLevel(logging.INFO)
 
 _CACHE_DIR_PATH = ".cache"
 _REQUEST_CACHE_FILE_NAME = "requests"
@@ -43,7 +40,7 @@ class Term(Enum):
 
 class Account:
     def __init__(self, account_json: Dict):
-        log.debug(f"account_json: {account_json}")
+        logging.debug(f"account_json: {account_json}")
         
         self.id = account_json["id"]
         self.name = account_json["name"]
@@ -95,20 +92,20 @@ class Account:
             case "otherDebt":
                 self.type = Account.Type.other_debt
             case _:
-                log.error(f"unexpected account type: {type_str}")
+                logging.error(f"unexpected account type: {type_str}")
                 raise Exception()
         
     def set_term(self, note: str):
-        log.debug(f"note: {note}")
+        logging.debug(f"note: {note}")
         
         def extract_term_from_note(note: str):
             if not note:
-                log.error(f"empty note")
+                logging.error(f"empty note")
                 raise Exception()
             
             match = re.search(r'\w+ Term', note)
             if not match:
-                log.error(f"term not found in note: {note}")
+                logging.error(f"term not found in note: {note}")
                 raise Exception()
             
             term = match.group(0)
@@ -123,7 +120,7 @@ class Account:
             case "long":
                 self.term = Term.long
             case _:
-                log.error(f"unexpected term: {term_str}")
+                logging.error(f"unexpected term: {term_str}")
                 raise Exception()
     
     def as_dict(self) -> Dict:
@@ -151,7 +148,7 @@ class Account:
 
 class Budget:
     def __init__(self, budget_json: Dict):
-        log.debug(f"budget_json: {budget_json}")
+        logging.debug(f"budget_json: {budget_json}")
         
         self.id = budget_json["id"]
         self.name = budget_json["name"]
@@ -167,7 +164,7 @@ class Budget:
                 
 class Category:        
     def __init__(self, category_json: Dict):
-        log.debug(f"category_json: {category_json}")
+        logging.debug(f"category_json: {category_json}")
         
         self.id = category_json["id"]
         self.name = re.sub(r'[^\w :()]', '', category_json["name"]).lstrip(" ")
@@ -207,7 +204,7 @@ class Category:
                 if goal_type_str is None:
                     self.goal_type = Category.GoalType.none
                 else:
-                    log.error(f"unexpected category goal type: {goal_type_str}")
+                    logging.error(f"unexpected category goal type: {goal_type_str}")
                     raise Exception()
 
     class GoalCadence(Enum):
@@ -231,7 +228,7 @@ class Category:
                     self.goal_cadence = Category.GoalCadence.none
                 else:
                     # See https://api.ynab.com/v1#/Categories/getCategories schema for definition of goal_cadence
-                    log.error(f"unexpected category goal type: {cadence}, want 0,1,2, or 13. 3-12 are legacy")
+                    logging.error(f"unexpected category goal type: {cadence}, want 0,1,2, or 13. 3-12 are legacy")
                     raise Exception()
         
     def set_goal_target_month(self, goal_target_month_str: str):
@@ -320,7 +317,7 @@ class DeltaCache(dict):
         if os.path.exists(self._file_path):
             with open(self._file_path) as f:
                 encoded_cache = json.load(f)
-                log.debug(f"encoded_cache: {encoded_cache}")
+                logging.debug(f"encoded_cache: {encoded_cache}")
                 cache: Dict = jsonpickle.decode(str(encoded_cache)) # type: ignore
                 
                 self.clear()
@@ -331,7 +328,7 @@ class DeltaCache(dict):
         del self._file_path
         
         encoded_cache = jsonpickle.encode(self)
-        log.debug(f"encoded_cache: {encoded_cache}")
+        logging.debug(f"encoded_cache: {encoded_cache}")
         with open(file_path, mode="w") as f:
             json.dump(encoded_cache, f)
             
@@ -395,7 +392,7 @@ class Client():
             auth=self.auth
         )
         resp.raise_for_status()
-        log.debug(f"Request limit used: {resp.headers['X-Rate-Limit']}")
+        logging.debug(f"Request limit used: {resp.headers['X-Rate-Limit']}")
             
         resp_dict = resp.json()
         return resp_dict["data"]
