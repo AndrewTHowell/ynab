@@ -42,14 +42,58 @@ class Account:
         
         self.id = account_json["id"]
         self.name = account_json["name"]
-        # TODO: use an enum for this
-        self.type = account_json["type"]
+        self.set_type(account_json["type"])
         self.on_budget = account_json["on_budget"]
         self.balance = milliunits_to_centiunits(account_json["balance"])
         # TODO: use an enum for this
         self.term = self.get_term(account_json["note"])
         self.closed = account_json["closed"]
-
+        
+    class Type(Enum):
+        checking = "Checking"
+        savings = "Savings"
+        cash = "Cash"
+        credit_card = "Credit Card"
+        line_of_credit = "Line of Credit"
+        other_asset = "Other Asset"
+        other_liability = "Other Liability"
+        mortgage = "mortgage"
+        auto_loan = "Auto Loan"
+        student_loan = "Student Loan"
+        personal_loan = "Personal Loan"
+        medical_debt = "Medical Debt"
+        other_debt = "Other Debt"
+    
+    def set_type(self, type_str: str):
+        match type_str:
+            case "checking":
+                self.type = Account.Type.checking
+            case "savings":
+                self.type = Account.Type.savings
+            case "cash":
+                self.type = Account.Type.cash
+            case "creditCard":
+                self.type = Account.Type.credit_card
+            case "lineOfCredit":
+                self.type = Account.Type.line_of_credit
+            case "otherAsset":
+                self.type = Account.Type.other_asset
+            case "otherLiability":
+                self.type = Account.Type.other_liability
+            case "autoLoan":
+                self.type = Account.Type.auto_loan
+            case "studentLoan":
+                self.type = Account.Type.student_loan
+            case "personalLoan":
+                self.type = Account.Type.personal_loan
+            case "medicalDebt":
+                self.type = Account.Type.medical_debt
+            case "otherDebt":
+                self.type = Account.Type.other_debt
+            case _:
+                log.error(f"unexpected account type: {type_str}")
+                raise Exception()
+        
     def get_term(self, note: str):
         log.debug(f"note: {note}")
         if not note:
@@ -115,6 +159,25 @@ class Category:
         target_balance = "Target Balance"
         target_balance_date = "Target Balance by Date"
         monthly_funding = "Monthly Funding"
+        
+    def set_goal_type(self, goal_type_str: str):
+        match goal_type_str:
+            case "":
+                self.goal_type = Category.GoalType.none
+            case "NEED":
+                self.goal_type = Category.GoalType.needed_for_spending
+            case "TB":
+                self.goal_type = Category.GoalType.target_balance
+            case "TBD":
+                self.goal_type = Category.GoalType.target_balance_date
+            case "MF":
+                self.goal_type = Category.GoalType.monthly_funding
+            case _:
+                if goal_type_str is None:
+                    self.goal_type = Category.GoalType.none
+                else:
+                    log.error(f"unexpected category goal type: {goal_type_str}")
+                    raise Exception()
 
     class GoalCadence(Enum):
         none = ""
@@ -138,25 +201,6 @@ class Category:
                 else:
                     # See https://api.ynab.com/v1#/Categories/getCategories schema for definition of goal_cadence
                     log.error(f"unexpected category goal type: {cadence}, want 0,1,2, or 13. 3-12 are legacy")
-                    raise Exception()
-        
-    def set_goal_type(self, goal_type_str: str):
-        match goal_type_str:
-            case "":
-                self.goal_type = Category.GoalType.none
-            case "NEED":
-                self.goal_type = Category.GoalType.needed_for_spending
-            case "TB":
-                self.goal_type = Category.GoalType.target_balance
-            case "TBD":
-                self.goal_type = Category.GoalType.target_balance_date
-            case "MF":
-                self.goal_type = Category.GoalType.monthly_funding
-            case _:
-                if goal_type_str is None:
-                    self.goal_type = Category.GoalType.none
-                else:
-                    log.error(f"unexpected category goal type: {goal_type_str}")
                     raise Exception()
         
     def set_goal_target_month(self, goal_target_month_str: str):
