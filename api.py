@@ -36,6 +36,11 @@ class BearerAuth(auth.AuthBase): # type: ignore
         r.headers["authorization"] = "Bearer " + self.token
         return r
 
+class Term(Enum):
+    short = "Short"
+    medium = "Medium"
+    long = "Long"
+                
 class Account:
     def __init__(self, account_json: Dict):
         log.debug(f"account_json: {account_json}")
@@ -45,8 +50,7 @@ class Account:
         self.set_type(account_json["type"])
         self.on_budget = account_json["on_budget"]
         self.balance = milliunits_to_centiunits(account_json["balance"])
-        # TODO: use an enum for this
-        self.term = self.get_term(account_json["note"])
+        self.set_term(account_json["note"])
         self.closed = account_json["closed"]
         
     class Type(Enum):
@@ -94,17 +98,33 @@ class Account:
                 log.error(f"unexpected account type: {type_str}")
                 raise Exception()
         
-    def get_term(self, note: str):
+    def set_term(self, note: str):
         log.debug(f"note: {note}")
-        if not note:
-            return ""
         
-        match = re.search(r'\w+ Term', note)
-        if not match:
-            return ""
-        
-        term = match.group(0)
-        return term.split()[0].title()
+        def extract_term_from_note(note: str):
+            if not note:
+                log.error(f"empty note")
+                raise Exception()
+            
+            match = re.search(r'\w+ Term', note)
+            if not match:
+                log.error(f"term not found in note: {note}")
+                raise Exception()
+            
+            term = match.group(0)
+            return term.split()[0].lower()
+
+        term_str = extract_term_from_note(note)
+        match term_str:
+            case "short":
+                self.term = Term.short
+            case "medium":
+                self.term = Term.medium
+            case "long":
+                self.term = Term.long
+            case _:
+                log.error(f"unexpected term: {term_str}")
+                raise Exception()
     
     def as_dict(self):
         return {
@@ -209,37 +229,36 @@ class Category:
             self.goal_target_month = datetime.strptime(goal_target_month_str, "%Y-%m-%d").date()
         
     def set_term(self):
-        # TODO: use an enum for this
         if self.goal_type != Category.GoalType.none:
             if self.goal_type == Category.GoalType.target_balance or self.goal_type == Category.GoalType.monthly_funding:
-                self.term = "Medium"
+                self.term = Term.medium
                 return
             
         if self.goal_months_to_budget:
             if self.goal_months_to_budget <= 3:
-                self.term = "Short"
+                self.term = Term.short
                 return
             if self.goal_months_to_budget <= 5*12:
-                self.term = "Medium"
+                self.term = Term.medium
                 return
             
         if self.goal_target_month:
             if self.goal_target_month <= datetime.today().date() + timedelta(days=3*30):
-                self.term = "Short"
+                self.term = Term.short
                 return
             if self.goal_target_month <= datetime.today().date() + timedelta(days=5*365):
-                self.term = "Medium"
+                self.term = Term.medium
                 return
             
         if self.category_group_name:
             if self.category_group_name == "Credit Card Payments":
-                self.term = "Short"
+                self.term = Term.short
                 return
             
         if self.name == "Amex Membership":
-            self.term = "Medium"
+            self.term = Term.medium
             
-        self.term = "Long"
+        self.term = Term.long
     
     def as_dict(self):
         return {

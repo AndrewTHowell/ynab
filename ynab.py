@@ -127,12 +127,14 @@ class YNAB:
             categories = client.get_categories()
             
         accounts = pd.DataFrame([ account.as_dict() for account in accounts ])
+        accounts["term"] = pd.Categorical(accounts["term"], [term for term in api.Term], ordered=True)
         self.accounts = accounts.sort_values("name")
         
         categories = pd.DataFrame([ category.as_dict() for category in categories ])
+        categories["term"] = pd.Categorical(categories["term"], [term for term in api.Term], ordered=True)
         self.categories = categories.sort_values(
             by=["term", "balance", "name"],
-            ascending=[False, True, True]
+            ascending=[False, True, True],
         )
 
     def report_accounts(self):
@@ -162,7 +164,7 @@ class YNAB:
             (accounts["on budget"] == True)
         ]
         accounts_by_term = open_accounts[["balance", "term"]]
-        accounts_by_term = accounts_by_term.groupby("term").sum()
+        accounts_by_term = accounts_by_term.groupby("term", observed=True).sum()
         accounts_by_term = accounts_by_term.rename(columns={"balance": "account balance"})
         
         active_categories = categories[
@@ -170,7 +172,7 @@ class YNAB:
             (~categories["category group name"].isin(["Internal Master Category", "Credit Card Payments"]))
         ]
         categories_by_term = active_categories[["balance", "term"]]
-        categories_by_term = categories_by_term.groupby("term").sum()
+        categories_by_term = categories_by_term.groupby("term", observed=True).sum()
         categories_by_term = categories_by_term.rename(columns={"balance": "category balance"})
         
         term_distribution = accounts_by_term.join(categories_by_term)
@@ -203,21 +205,26 @@ def format_currency(centiunit):
 
 def format_currencies(df: pd.DataFrame):
     """Replaces all int columns with formatted string columns"""
-    def format_column(col):
+    def format_column(col: pd.Series):
         if col.dtype != int:
             return col
         return col.apply(format_currency)
 
     return df.apply(format_column)
-
+        
 def format_enums(df: pd.DataFrame):
     """Replaces all enums with their values"""
-    def format_enum(col):
+    def format_enum_col(col: pd.Series):
+        def format_enum(val):
+            if hasattr(val, 'value'):
+                return val.value
+            return val
+        
         if isinstance(col.iloc[0], Enum):
-            return col.apply(lambda x: x.value)
+            return col.apply(format_enum)
         return col
 
-    return df.apply(format_enum)
+    return df.apply(format_enum_col)
 
 def format_panda(df: pd.DataFrame, total_row: str=""):
     if total_row:
