@@ -8,6 +8,7 @@ import pandas as pd
 from tabulate import tabulate
 from simple_term_menu import TerminalMenu
 import random
+from enum import Enum
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 logging.basicConfig(format="%(levelname)s: %(message)s")
@@ -185,12 +186,13 @@ class YNAB:
         
         categories_that_rollover = categories[
             (categories["hidden"] == False) &
-            (categories["goal type"] == api.CategoryGoalType.needed_for_spending.value) &
+            (categories["goal type"] == api.CategoryGoalType.needed_for_spending) &
             (
-                (categories["goal cadence"] == api.CategoryGoalCadence.weekly.value) |
-                (categories["goal cadence"] == api.CategoryGoalCadence.monthly.value)
+                (categories["goal cadence"] == api.CategoryGoalCadence.weekly) |
+                (categories["goal cadence"] == api.CategoryGoalCadence.monthly)
             )
         ]
+        print(categories_that_rollover)
         
         rollover_total = categories_that_rollover["balance"].sum()
         rollover = pd.DataFrame({"Rollover Balance": rollover_total}, index=[0])
@@ -210,6 +212,15 @@ def format_currencies(df: pd.DataFrame):
 
     return df.apply(format_column)
 
+def format_enums(df: pd.DataFrame):
+    """Replaces all enums with their values"""
+    def format_enum(col):
+        if isinstance(col.iloc[0], Enum):
+            return col.apply(lambda x: x.value)
+        return col
+
+    return df.apply(format_enum)
+
 def format_panda(df: pd.DataFrame, total_row: str=""):
     if total_row:
         totals = pd.DataFrame([df.apply(pd.to_numeric, errors="coerce").fillna("").sum()])
@@ -218,6 +229,7 @@ def format_panda(df: pd.DataFrame, total_row: str=""):
         
     df.columns = map(str.title, df.columns) # type: ignore
     df = format_currencies(df)
+    df = format_enums(df)
     
     return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=False) # type: ignore
 

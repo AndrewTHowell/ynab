@@ -196,11 +196,10 @@ class Category:
         self.term = "Long"
     
     def as_dict(self):
-        # TODO: use direct enums in dict repr. Could add __repr__ to enum classes? That would mean they'd still be enum typed but show just the value
         return {
             "id": self.id, "name": self.name, "balance": self.balance, "term": self.term,
-            "category group name": self.category_group_name, "goal type": self.goal_type.value,
-            "goal target month": self.goal_target_month,"goal cadence": self.goal_cadence.value,
+            "category group name": self.category_group_name, "goal type": self.goal_type,
+            "goal target month": self.goal_target_month,"goal cadence": self.goal_cadence,
             "goal cadence frequency": self.goal_cadence_frequency, "hidden": self.hidden, "deleted": self.deleted,
         }
 
