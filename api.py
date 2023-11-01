@@ -1,12 +1,12 @@
 import urllib.parse
-from decimal import Decimal
 import re
 import os
+import pandas as pd
 import json
 from typing import Any, Dict, List, Protocol
 from datetime import datetime, timedelta
 import jsonpickle
-from requests import auth, Session
+from requests import auth
 import requests_cache
 import logging
 import locale
@@ -126,11 +126,16 @@ class Account:
                 log.error(f"unexpected term: {term_str}")
                 raise Exception()
     
-    def as_dict(self):
+    def as_dict(self) -> Dict:
         return {
             "id": self.id, "name": self.name, "type": self.type, "on budget": self.on_budget,
             "balance": self.balance, "term": self.term, "closed": self.closed,
         }
+        
+    def as_panda(self) -> pd.DataFrame:
+        accounts = pd.DataFrame([self.as_dict()])
+        accounts["term"] = pd.Categorical(accounts["term"], [term for term in Term], ordered=True)
+        return accounts
 
     def __str__(self):
         return self.name
@@ -267,6 +272,11 @@ class Category:
             "goal target month": self.goal_target_month,"goal cadence": self.goal_cadence,
             "goal cadence frequency": self.goal_cadence_frequency, "hidden": self.hidden, "deleted": self.deleted,
         }
+        
+    def as_panda(self) -> pd.DataFrame:
+        categories = pd.DataFrame([self.as_dict()])
+        categories["term"] = pd.Categorical(categories["term"], [term for term in Term], ordered=True)
+        return categories
 
     def __str__(self):
         return self.name

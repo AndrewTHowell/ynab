@@ -125,13 +125,11 @@ class YNAB:
         with api.Client(auth_token=self.auth_token, cache_ttl=self.cache_ttl, flush_cache=flush_cache) as client:     
             accounts = client.get_accounts()
             categories = client.get_categories()
-            
-        accounts = pd.DataFrame([ account.as_dict() for account in accounts ])
-        accounts["term"] = pd.Categorical(accounts["term"], [term for term in api.Term], ordered=True)
+        
+        accounts = pd.concat([ account.as_panda() for account in accounts ], ignore_index=True)
         self.accounts = accounts.sort_values("name")
         
-        categories = pd.DataFrame([ category.as_dict() for category in categories ])
-        categories["term"] = pd.Categorical(categories["term"], [term for term in api.Term], ordered=True)
+        categories = pd.concat([ category.as_panda() for category in categories ], ignore_index=True)
         self.categories = categories.sort_values(
             by=["term", "balance", "name"],
             ascending=[False, True, True],
