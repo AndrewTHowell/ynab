@@ -40,7 +40,7 @@ class Term(Enum):
     short = "Short"
     medium = "Medium"
     long = "Long"
-                
+
 class Account:
     def __init__(self, account_json: Dict):
         log.debug(f"account_json: {account_json}")
@@ -132,18 +132,23 @@ class Account:
             "balance": self.balance, "term": self.term, "closed": self.closed,
         }
         
-    def as_panda(self) -> pd.DataFrame:
+    def to_df(self) -> pd.DataFrame:
         accounts = pd.DataFrame([self.as_dict()])
         accounts["term"] = pd.Categorical(accounts["term"], [term for term in Term], ordered=True)
         accounts["type"] = pd.Categorical(accounts["type"], [type for type in Account.Type], ordered=True)
         return accounts
+    
+    @classmethod
+    def collect_as_df(cls, accounts):
+        accounts_df = pd.concat([ account.to_df() for account in accounts ], ignore_index=True)
+        return accounts_df.sort_values("name")
 
     def __str__(self):
         return self.name
     
     def __repr__(self):
         return self.__str__()
-    
+
 class Budget:
     def __init__(self, budget_json: Dict):
         log.debug(f"budget_json: {budget_json}")
@@ -274,12 +279,20 @@ class Category:
             "goal cadence frequency": self.goal_cadence_frequency, "hidden": self.hidden, "deleted": self.deleted,
         }
         
-    def as_panda(self) -> pd.DataFrame:
+    def to_df(self) -> pd.DataFrame:
         categories = pd.DataFrame([self.as_dict()])
         categories["goal cadence"] = pd.Categorical(categories["goal cadence"], [cadence for cadence in Category.GoalCadence], ordered=True)
         categories["goal type"] = pd.Categorical(categories["goal type"], [type for type in Category.GoalType], ordered=True)
         categories["term"] = pd.Categorical(categories["term"], [term for term in Term], ordered=True)
         return categories
+    
+    @classmethod
+    def collect_as_df(cls, categories):
+        categories_df = pd.concat([ category.to_df() for category in categories ], ignore_index=True)
+        return categories_df.sort_values(
+            by=["term", "balance", "name"],
+            ascending=[False, True, True],
+        )
 
     def __str__(self):
         return self.name

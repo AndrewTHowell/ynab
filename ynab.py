@@ -126,14 +126,8 @@ class YNAB:
             accounts = client.get_accounts()
             categories = client.get_categories()
         
-        accounts = pd.concat([ account.as_panda() for account in accounts ], ignore_index=True)
-        self.accounts = accounts.sort_values("name")
-        
-        categories = pd.concat([ category.as_panda() for category in categories ], ignore_index=True)
-        self.categories = categories.sort_values(
-            by=["term", "balance", "name"],
-            ascending=[False, True, True],
-        )
+        self.accounts = api.Account.collect_as_df(accounts)
+        self.categories = api.Category.collect_as_df(categories)
 
     def report_accounts(self):
         accounts = self.accounts.copy(deep=True)
