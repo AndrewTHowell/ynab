@@ -50,6 +50,7 @@ def main():
         action='store_true',
         dest="flush_cache",
     )
+    # TODO: take in arg for month
     parser.add_argument(
         "-d", "--debug",
         help="Turn on debug logging.",
@@ -123,6 +124,7 @@ class YNAB:
     
     def load_data(self, flush_cache):
         with api.Client(auth_token=self.auth_token, cache_ttl=self.cache_ttl, flush_cache=flush_cache) as client:
+            # TODO: don't get entire budget just for the static `last-used` id
             budget = client.get_last_used_budget()         
             accounts = client.get_accounts(budget_id=budget.id)
             categories = client.get_categories(budget_id=budget.id)
