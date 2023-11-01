@@ -27,29 +27,29 @@ class Config():
             
             logging.debug(f"auth_token: {self.auth_token}")
             logging.debug(f"cache_ttl: {self.cache_ttl}")
-        
+
 
 def main():
     parser = argparse.ArgumentParser(
-        prog="YNAB",
+        prog="ynab.py",
         description="Script for consuming and processing YNAB data.",
     )
     parser.add_argument(
         "-c", "--config_file_path",
-        help="The path to the configuration for this script.",
+        help="The path to the configuration for this script. See schema at `config_schema.json`",
         type=valid_file_path,
         dest="config_file_path",
         default="config.json"
     )
     parser.add_argument(
         "-f", "--flush_cache",
-        help="Flush the cache.",
+        help="Flush the cache",
         action='store_true',
         dest="flush_cache",
     )
     parser.add_argument(
         "-d", "--debug",
-        help="Turn on debug logging.",
+        help="Turn on debug logging",
         action='store_true',
         dest="debug"
     )

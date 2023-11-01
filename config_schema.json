@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "properties": {
+    "auth_token": {
+      "type": "string"
+    },
+    "cache_ttl": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "auth_token",
+    "cache_ttl"
+  ]
+}
