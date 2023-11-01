@@ -135,6 +135,7 @@ class Account:
     def as_panda(self) -> pd.DataFrame:
         accounts = pd.DataFrame([self.as_dict()])
         accounts["term"] = pd.Categorical(accounts["term"], [term for term in Term], ordered=True)
+        accounts["type"] = pd.Categorical(accounts["type"], [type for type in Account.Type], ordered=True)
         return accounts
 
     def __str__(self):
@@ -275,6 +276,8 @@ class Category:
         
     def as_panda(self) -> pd.DataFrame:
         categories = pd.DataFrame([self.as_dict()])
+        categories["goal cadence"] = pd.Categorical(categories["goal cadence"], [cadence for cadence in Category.GoalCadence], ordered=True)
+        categories["goal type"] = pd.Categorical(categories["goal type"], [type for type in Category.GoalType], ordered=True)
         categories["term"] = pd.Categorical(categories["term"], [term for term in Term], ordered=True)
         return categories
 
