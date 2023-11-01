@@ -37,4 +37,5 @@ A CLI tool for performing custom analysis on your You Need A Budget (YNAB) data,
 ## TODO
 
 - Revisit jsonpickle issue
-  - Not native JSON in the file
+  - Non-native JSON in the file
+- Pull file paths out and into config
