@@ -50,7 +50,6 @@ def main():
         action='store_true',
         dest="flush_cache",
     )
-    # TODO: take in arg for month
     parser.add_argument(
         "-d", "--debug",
         help="Turn on debug logging.",
