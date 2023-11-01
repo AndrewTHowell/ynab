@@ -89,19 +89,6 @@ class Budget:
     
     def __repr__(self):
         return self.__str__()
-
-class CategoryGoalType(Enum):
-    none = "None"
-    needed_for_spending = "Needed For Spending"
-    target_balance = "Target Balance"
-    target_balance_date = "Target Balance by Date"
-    monthly_funding = "Monthly Funding"
-
-class CategoryGoalCadence(Enum):
-    none = ""
-    monthly = "Monthly"
-    weekly = "Weekly"
-    yearly = "Yearly"
                 
 class Category:        
     def __init__(self, category_json: Dict):
@@ -122,19 +109,32 @@ class Category:
         self.set_goal_target_month(category_json["goal_target_month"])
         self.set_term()
         
+    class GoalType(Enum):
+        none = "None"
+        needed_for_spending = "Needed For Spending"
+        target_balance = "Target Balance"
+        target_balance_date = "Target Balance by Date"
+        monthly_funding = "Monthly Funding"
+
+    class GoalCadence(Enum):
+        none = ""
+        monthly = "Monthly"
+        weekly = "Weekly"
+        yearly = "Yearly"   
+        
     def set_cadence(self, cadence: int):
         match cadence:
             case 0:
-                self.goal_cadence = CategoryGoalCadence.none
+                self.goal_cadence = Category.GoalCadence.none
             case 1:
-                self.goal_cadence = CategoryGoalCadence.monthly
+                self.goal_cadence = Category.GoalCadence.monthly
             case 2:
-                self.goal_cadence = CategoryGoalCadence.weekly
+                self.goal_cadence = Category.GoalCadence.weekly
             case 13:
-                self.goal_cadence = CategoryGoalCadence.yearly
+                self.goal_cadence = Category.GoalCadence.yearly
             case _:
                 if cadence is None:
-                    self.goal_cadence = CategoryGoalCadence.none
+                    self.goal_cadence = Category.GoalCadence.none
                 else:
                     # See https://api.ynab.com/v1#/Categories/getCategories schema for definition of goal_cadence
                     log.error(f"unexpected category goal type: {cadence}, want 0,1,2, or 13. 3-12 are legacy")
@@ -143,18 +143,18 @@ class Category:
     def set_goal_type(self, goal_type_str: str):
         match goal_type_str:
             case "":
-                self.goal_type = CategoryGoalType.none
+                self.goal_type = Category.GoalType.none
             case "NEED":
-                self.goal_type = CategoryGoalType.needed_for_spending
+                self.goal_type = Category.GoalType.needed_for_spending
             case "TB":
-                self.goal_type = CategoryGoalType.target_balance
+                self.goal_type = Category.GoalType.target_balance
             case "TBD":
-                self.goal_type = CategoryGoalType.target_balance_date
+                self.goal_type = Category.GoalType.target_balance_date
             case "MF":
-                self.goal_type = CategoryGoalType.monthly_funding
+                self.goal_type = Category.GoalType.monthly_funding
             case _:
                 if goal_type_str is None:
-                    self.goal_type = CategoryGoalType.none
+                    self.goal_type = Category.GoalType.none
                 else:
                     log.error(f"unexpected category goal type: {goal_type_str}")
                     raise Exception()
@@ -166,8 +166,8 @@ class Category:
         
     def set_term(self):
         # TODO: use an enum for this
-        if self.goal_type != CategoryGoalType.none:
-            if self.goal_type == CategoryGoalType.target_balance or self.goal_type == CategoryGoalType.monthly_funding:
+        if self.goal_type != Category.GoalType.none:
+            if self.goal_type == Category.GoalType.target_balance or self.goal_type == Category.GoalType.monthly_funding:
                 self.term = "Medium"
                 return
             

@@ -185,10 +185,10 @@ class YNAB:
         
         categories_that_rollover = categories[
             (categories["hidden"] == False) &
-            (categories["goal type"] == api.CategoryGoalType.needed_for_spending) &
+            (categories["goal type"] == api.Category.GoalType.needed_for_spending) &
             (
-                (categories["goal cadence"] == api.CategoryGoalCadence.weekly) |
-                (categories["goal cadence"] == api.CategoryGoalCadence.monthly)
+                (categories["goal cadence"] == api.Category.GoalCadence.weekly) |
+                (categories["goal cadence"] == api.Category.GoalCadence.monthly)
             )
         ]
         
