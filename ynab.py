@@ -172,7 +172,8 @@ class YNAB:
         
         term_distribution = accounts_by_term.join(categories_by_term)
         term_distribution = term_distribution.reset_index()
-        term_distribution = term_distribution.sort_values("term", ascending=False)
+        term_distribution = term_distribution.sort_values("term", ascending=True)
+        
         term_distribution["redistribute"] = term_distribution.apply(lambda row: row["category balance"] - row["account balance"], axis=1)
         
         return format_panda(term_distribution, total_row="term")
