@@ -83,7 +83,6 @@ class YNAB:
                 "[n] Net Worth",
                 "[t] Term Distribution",
                 "[r] Rollover Balance",
-                "[p] Delete Redundant Payees",
                 "[d] Data",
                 "[e] Exit"
             ]
@@ -98,29 +97,10 @@ class YNAB:
                 case 2:
                     print(self.report_rollover())
                 case 3:
-                    self.redundant_payee_menu()
-                case 4:
                     self.data_menu()
                 case _:
                     number_of_e = random.randrange(2, 10)
                     print(f"Y{'e'*number_of_e}t")
-                    break
-    
-    def redundant_payee_menu(self):
-        while True:
-            redundant_payees = self.report_redundant_payees()
-            print(redundant_payees)
-            options = [
-                "[d] Delete All",
-                "[b] Back"
-            ]
-            terminal_menu = TerminalMenu(options, title="Redundant Payee Menu")
-            choice = terminal_menu.show()
-            
-            match choice:
-                case 0:
-                    self.delete_payees(redundant_payees)
-                case _:
                     break
     
     def data_menu(self):
@@ -128,6 +108,7 @@ class YNAB:
             options = [
                 "[a] Accounts",
                 "[c] Categories",
+                "[p] Redundant Payees",
                 "[r] Refresh Data",
                 "[b] Back"
             ]
@@ -140,7 +121,9 @@ class YNAB:
                 case 1:
                     print(self.report_categories())
                 case 2:
-                    self.load_data()
+                    print(self.report_redundant_payees())
+                case 3:
+                    self.reload_data()
                 case _:
                     break
                 
@@ -155,6 +138,11 @@ class YNAB:
         self.categories = api.Category.collect_as_df(categories)
         self.payees = api.Payee.collect_as_df(payees)
         self.transactions = api.Transaction.collect_as_df(transactions)
+        
+    def reload_data(self):
+        self.client.clear_cache()
+
+        self.load_data()
 
     def report_accounts(self):
         accounts = self.accounts.copy(deep=True)
@@ -223,20 +211,23 @@ class YNAB:
         payees = self.payees.copy(deep=True)
         transactions = self.transactions.copy(deep=True)
         
-        payees = payees[payees["deleted"] == False]
+        payees = payees[
+            (payees["deleted"] == False) &
+            (payees["transfer account id"].isnull())
+        ]
                
         def get_num_of_transactions(payee: pd.Series):
             nonlocal transactions
-            transactions = transactions[transactions["payee_id"] == payee["id"]]
-            return len(transactions)
+            payee_transactions = transactions[transactions["payee id"] == payee["id"]]
+            return len(payee_transactions)
             
-        payees["num_of_transactions"] = payees.apply(get_num_of_transactions, axis=1)
+        payees["num of transactions"] = payees.apply(get_num_of_transactions, axis=1)
+        
+        payees = payees[payees["num of transactions"] == 0]
+        payees = payees[["id", "name"]]
         
         return format_panda(payees)
-
-    def delete_payees(self, payees):
-        print("Unimplemented")
-
+        
 def format_currency(centiunit):
     unit = centiunit / 100
     return locale.currency(unit, grouping=True)
