@@ -322,6 +322,41 @@ class Payee:
     def __repr__(self):
         return self.__str__()
 
+class Transaction:
+    def __init__(self, transaction_json: Dict):
+        logging.debug(f"transaction_json: {transaction_json}")
+        
+        self.id = transaction_json["id"]
+        self.date = transaction_json["date"]
+        self.amount = transaction_json["amount"]
+        self.account_name = transaction_json["account_name"]
+        self.payee_name = transaction_json["payee_name"]
+        self.deleted = transaction_json["deleted"]
+    
+    def as_dict(self):
+        return {
+            "id": self.id, "date": self.date, "amount": self.amount,
+            "account name": self.account_name, "payee name": self.payee_name,
+            "deleted": self.deleted
+        }
+        
+    def to_df(self) -> pd.DataFrame:
+        return pd.DataFrame([self.as_dict()])
+    
+    @classmethod
+    def collect_as_df(cls, transactions):
+        transactions_df = pd.concat([ transaction.to_df() for transaction in transactions ], ignore_index=True)
+        return transactions_df.sort_values(
+            by=["date", "account_name"],
+            ascending=[False, True],
+        )
+
+    def __str__(self):
+        return self.id
+    
+    def __repr__(self):
+        return self.__str__()
+
 class DeltaCacheData(Protocol):
     id: str
     
@@ -383,6 +418,7 @@ class Client():
     _budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
     _payees_url = "budgets/{}/payees"
+    _transactions_url = "budgets/{}/transactions"
     
     def __init__(self, auth_token: str, flush_cache: bool, cache_ttl=_REQUEST_CACHE_EXPIRY_SECONDS):
         self.auth = BearerAuth(auth_token)
@@ -483,3 +519,19 @@ class Client():
             self.cache.update_data("payees", resp_data["server_knowledge"], payees)
             
         return payees
+       
+    def get_transactions(self, budget_id=LAST_USED_BUDGET_ID) -> List[Transaction]:  
+        server_knowledge = None
+        if not self.cache is None and "transactions" in self.cache:
+            server_knowledge = self.cache["transactions"].server_knowledge
+              
+        resp_data = self.get(self._transactions_url.format(budget_id), server_knowledge)
+        transactions = [
+            Transaction(transaction_json)
+            for transaction_json in resp_data["transactions"]
+        ] 
+        
+        if not self.cache is None:
+            self.cache.update_data("transactions", resp_data["server_knowledge"], transactions)
+            
+        return transactions
