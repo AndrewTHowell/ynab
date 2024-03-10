@@ -300,10 +300,11 @@ class Payee:
         
         self.id = payee_json["id"]
         self.name = payee_json["name"]
+        self.transfer_account_id = payee_json["transfer_account_id"]
         self.deleted = payee_json["deleted"]
     
     def as_dict(self):
-        return {"id": self.id, "name": self.name, "deleted": self.deleted}
+        return {"id": self.id, "name": self.name, "transfer account id": self.transfer_account_id, "deleted": self.deleted}
         
     def to_df(self) -> pd.DataFrame:
         return pd.DataFrame([self.as_dict()])
@@ -331,13 +332,14 @@ class Transaction:
         self.amount = transaction_json["amount"]
         self.account_name = transaction_json["account_name"]
         self.payee_name = transaction_json["payee_name"]
+        self.payee_id = transaction_json["payee_id"]
         self.deleted = transaction_json["deleted"]
     
     def as_dict(self):
         return {
             "id": self.id, "date": self.date, "amount": self.amount,
             "account name": self.account_name, "payee name": self.payee_name,
-            "deleted": self.deleted
+            "payee id": self.payee_id, "deleted": self.deleted
         }
         
     def to_df(self) -> pd.DataFrame:
@@ -347,7 +349,7 @@ class Transaction:
     def collect_as_df(cls, transactions):
         transactions_df = pd.concat([ transaction.to_df() for transaction in transactions ], ignore_index=True)
         return transactions_df.sort_values(
-            by=["date", "account_name"],
+            by=["date", "account name"],
             ascending=[False, True],
         )
 
@@ -433,7 +435,7 @@ class Client():
             expire_after=cache_ttl,
         )
         if flush_cache:
-            self.session.cache.clear()
+            self.clear_cache()
             
         self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE), flush_cache=flush_cache)
         
@@ -444,6 +446,11 @@ class Client():
     def __exit__(self, *args):
         if not self.cache is None:
             self.cache.save_to_file()
+ 
+    def clear_cache(self, *args):
+        self.session.cache.clear()
+
+        self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE), flush_cache=True)
             
     def record_rate_limit(self, rate_limit: str):
         current, max = rate_limit.split("/")
