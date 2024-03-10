@@ -148,9 +148,13 @@ class YNAB:
     def load_data(self):    
         accounts = self.client.get_accounts()
         categories = self.client.get_categories()
+        payees = self.client.get_payees()
+        transactions = self.client.get_transactions()
         
         self.accounts = api.Account.collect_as_df(accounts)
         self.categories = api.Category.collect_as_df(categories)
+        self.payees = api.Payee.collect_as_df(payees)
+        self.transactions = api.Transaction.collect_as_df(transactions)
 
     def report_accounts(self):
         accounts = self.accounts.copy(deep=True)
@@ -216,12 +220,17 @@ class YNAB:
         return format_panda(rollover)
 
     def report_redundant_payees(self):
-        payees = self.client.get_payees()
-        payees = api.Payee.collect_as_df(payees)
+        payees = self.payees.copy(deep=True)
+        transactions = self.transactions.copy(deep=True)
         
         payees = payees[payees["deleted"] == False]
-        
-        # payees_with_num_of_transactions = payees.apply()
+               
+        def get_num_of_transactions(payee: pd.Series):
+            nonlocal transactions
+            transactions = transactions[transactions["payee_id"] == payee["id"]]
+            return len(transactions)
+            
+        payees["num_of_transactions"] = payees.apply(get_num_of_transactions, axis=1)
         
         return format_panda(payees)
 
