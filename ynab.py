@@ -83,6 +83,7 @@ class YNAB:
                 "[n] Net Worth",
                 "[t] Term Distribution",
                 "[r] Rollover Balance",
+                "[p] Delete Redundant Payees",
                 "[d] Data",
                 "[e] Exit"
             ]
@@ -97,10 +98,29 @@ class YNAB:
                 case 2:
                     print(self.report_rollover())
                 case 3:
+                    self.redundant_payee_menu()
+                case 4:
                     self.data_menu()
                 case _:
                     number_of_e = random.randrange(2, 10)
                     print(f"Y{'e'*number_of_e}t")
+                    break
+    
+    def redundant_payee_menu(self):
+        while True:
+            redundant_payees = self.report_redundant_payees()
+            print(redundant_payees)
+            options = [
+                "[d] Delete All",
+                "[b] Back"
+            ]
+            terminal_menu = TerminalMenu(options, title="Redundant Payee Menu")
+            choice = terminal_menu.show()
+            
+            match choice:
+                case 0:
+                    self.delete_payees(redundant_payees)
+                case _:
                     break
     
     def data_menu(self):
@@ -194,6 +214,19 @@ class YNAB:
         rollover = pd.DataFrame({"Rollover Balance": rollover_total}, index=[0])
         
         return format_panda(rollover)
+
+    def report_redundant_payees(self):
+        payees = self.client.get_payees()
+        payees = api.Payee.collect_as_df(payees)
+        
+        payees = payees[payees["deleted"] == False]
+        
+        # payees_with_num_of_transactions = payees.apply()
+        
+        return format_panda(payees)
+
+    def delete_payees(self, payees):
+        print("Unimplemented")
 
 def format_currency(centiunit):
     unit = centiunit / 100
