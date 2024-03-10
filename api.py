@@ -294,6 +294,34 @@ class Category:
     def __repr__(self):
         return self.__str__()
 
+class Payee:
+    def __init__(self, payee_json: Dict):
+        logging.debug(f"payee_json: {payee_json}")
+        
+        self.id = payee_json["id"]
+        self.name = payee_json["name"]
+        self.deleted = payee_json["deleted"]
+    
+    def as_dict(self):
+        return {"id": self.id, "name": self.name, "deleted": self.deleted}
+        
+    def to_df(self) -> pd.DataFrame:
+        return pd.DataFrame([self.as_dict()])
+    
+    @classmethod
+    def collect_as_df(cls, payees):
+        payees_df = pd.concat([ payee.to_df() for payee in payees ], ignore_index=True)
+        return payees_df.sort_values(
+            by=["name", "id"],
+            ascending=True,
+        )
+
+    def __str__(self):
+        return self.name
+    
+    def __repr__(self):
+        return self.__str__()
+
 class DeltaCacheData(Protocol):
     id: str
     
@@ -354,6 +382,7 @@ class Client():
     _budget_url = "budgets/{}"
     _budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
+    _payees_url = "budgets/{}/payees"
     
     def __init__(self, auth_token: str, flush_cache: bool, cache_ttl=_REQUEST_CACHE_EXPIRY_SECONDS):
         self.auth = BearerAuth(auth_token)
@@ -438,3 +467,19 @@ class Client():
             self.cache.update_data("categories", resp_data["server_knowledge"], categories)
             
         return categories
+       
+    def get_payees(self, budget_id=LAST_USED_BUDGET_ID) -> List[Payee]:  
+        server_knowledge = None
+        if not self.cache is None and "payees" in self.cache:
+            server_knowledge = self.cache["payees"].server_knowledge
+              
+        resp_data = self.get(self._payees_url.format(budget_id), server_knowledge)
+        payees = [
+            Payee(payee_json)
+            for payee_json in resp_data["payees"]
+        ] 
+        
+        if not self.cache is None:
+            self.cache.update_data("payees", resp_data["server_knowledge"], payees)
+            
+        return payees
