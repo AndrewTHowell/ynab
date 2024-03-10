@@ -4,7 +4,7 @@ import os
 import pandas as pd
 import json
 from typing import Any, Dict, List, Protocol
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 import jsonpickle
 from requests import auth
 import requests_cache
@@ -420,6 +420,8 @@ class Client():
     _payees_url = "budgets/{}/payees"
     _transactions_url = "budgets/{}/transactions"
     
+    _rate_warn_threshold = 0.95
+    
     def __init__(self, auth_token: str, flush_cache: bool, cache_ttl=_REQUEST_CACHE_EXPIRY_SECONDS):
         self.auth = BearerAuth(auth_token)
         
@@ -435,12 +437,23 @@ class Client():
             
         self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE), flush_cache=flush_cache)
         
+        
     def __enter__(self):
         return self
  
     def __exit__(self, *args):
         if not self.cache is None:
             self.cache.save_to_file()
+            
+    def record_rate_limit(self, rate_limit: str):
+        current, max = rate_limit.split("/")
+        current, max = int(current), int(max)
+        
+        self.current_rate = current
+        
+        logging.debug(f"Request limit used: {current}/{max}")
+        if current/max > self._rate_warn_threshold :
+            logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
     def get(self, url: str, server_knowledge=None):
         params={}
@@ -454,8 +467,9 @@ class Client():
             auth=self.auth
         )
         resp.raise_for_status()
-        logging.debug(f"Request limit used: {resp.headers['X-Rate-Limit']}")
-            
+        
+        self.record_rate_limit(resp.headers['X-Rate-Limit'])
+
         resp_dict = resp.json()
         return resp_dict["data"]
         
