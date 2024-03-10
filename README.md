@@ -47,6 +47,7 @@ options:
 - Raw data
   - Accounts
   - Categories
+  - Redundant Payees (Payees with no associated Transactions which can likely be deleted)
 
 ### Non-Functional
 
@@ -55,6 +56,7 @@ options:
   - Configurable TTL
   - YNAB data doesn't change much, so avoid repetitive calls during testing
   - YNAB limits calls to 200 an hour
+    - Warning log added in case it gets close to the limit
 - Delta Cache
   - Only request data that has changed by storing pointer to last call (known as `last_knowledge_of_server`)
   - Store this using jsonpickle
