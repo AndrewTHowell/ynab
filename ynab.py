@@ -69,12 +69,13 @@ def main():
     YNAB(config, args.flush_cache)
     
 class YNAB:
-    def __init__(self, config, flush_cache):
-        self.auth_token = config.auth_token
-        self.cache_ttl = config.cache_ttl        
-        self.load_data(flush_cache)
+    def __init__(self, config, flush_cache):        
+        with api.Client(auth_token=config.auth_token, cache_ttl=config.cache_ttl, flush_cache=flush_cache) as client:
+            self.client = client
+            
+            self.load_data()
         
-        self.main_menu()
+            self.main_menu()
     
     def main_menu(self):
         while True:
@@ -119,15 +120,14 @@ class YNAB:
                 case 1:
                     print(self.report_categories())
                 case 2:
-                    self.load_data(True)
+                    self.load_data()
                 case _:
                     break
                 
     
-    def load_data(self, flush_cache):
-        with api.Client(auth_token=self.auth_token, cache_ttl=self.cache_ttl, flush_cache=flush_cache) as client:     
-            accounts = client.get_accounts()
-            categories = client.get_categories()
+    def load_data(self):    
+        accounts = self.client.get_accounts()
+        categories = self.client.get_categories()
         
         self.accounts = api.Account.collect_as_df(accounts)
         self.categories = api.Category.collect_as_df(categories)
