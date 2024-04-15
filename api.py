@@ -426,7 +426,7 @@ class DeltaCache(dict):
         with open(file_path, mode="w") as f:
             json.dump(encoded_cache, f)
             
-    def update_data(self, key: str, server_knowledge:int, data: List[Any]):
+    def update_data(self, key: str, server_knowledge:int, data: List[Any], id: str ="id"):
         cached_data = []
         if key in self:
             cached_data = self[key].data
@@ -435,7 +435,7 @@ class DeltaCache(dict):
         for cached_datum in cached_data:
             found = False
             for datum_to_cache in data_to_cache:
-                if cached_datum.id == datum_to_cache.id:
+                if cached_datum.__dict__[id] == datum_to_cache.__dict__[id]:
                     # Cached datum was also in the delta response
                     found = True
             
