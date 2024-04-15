@@ -97,12 +97,12 @@ class Account:
         
         def extract_term_from_note(note: str):
             if not note:
-                logging.error(f"empty note")
+                logging.error(f"account {self.name}: empty note")
                 raise Exception()
             
             match = re.search(r'\w+ Term', note)
             if not match:
-                logging.error(f"term not found in note: {note}")
+                logging.error(f"account {self.name}: term not found in note: {note}")
                 raise Exception()
             
             term = match.group(0)
@@ -117,7 +117,7 @@ class Account:
             case "long":
                 self.term = Term.long
             case _:
-                logging.error(f"unexpected term: {term_str}")
+                logging.error(f"account {self.name}: unexpected term: {term_str}")
                 raise Exception()
     
     def as_dict(self) -> Dict:
