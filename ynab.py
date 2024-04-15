@@ -91,9 +91,7 @@ class YNAB:
             self.main_menu()
     
     def main_menu(self):
-        
-        print(self.months)
-        
+                
         while True:
             options = [
                 "[n] Net Worth",

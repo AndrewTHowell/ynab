@@ -451,9 +451,12 @@ class Client():
     _budget_url = "budgets/{}"
     _budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
+    _category_by_month_url = "budgets/{}/months/{}/categories/{}"
     _months_url = "budgets/{}/months"
     _payees_url = "budgets/{}/payees"
     _transactions_url = "budgets/{}/transactions"
+    
+    non_delta_cacheable_urls = {_category_by_month_url}
     
     _rate_warn_threshold = 0.95
     
@@ -516,8 +519,9 @@ class Client():
             logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
     def get(self, url: str, data_extractor: Callable, resource_id: str="id"):
-        params={}       
-        if not self.cache is None and url in self.cache:
+        params={}
+        should_cache = not self.cache is None and url not in self.non_delta_cacheable_urls
+        if should_cache and url in self.cache:
             # When the cache is frozen, don't call to update the delta, just reuse what is already stored locally
             if self.cache.frozen:
                 logging.debug(f"Delta frozen, returning existing data for URL '{url}'")
@@ -536,7 +540,7 @@ class Client():
         resp_data = resp.json()["data"]
         resp_resource = data_extractor(resp_data)
         
-        if not self.cache is None:
+        if should_cache:
             self.cache.update_data(url, resp_data["server_knowledge"], resp_resource, resource_id=resource_id)
             
         return resp_resource
@@ -556,6 +560,9 @@ class Client():
             for category_group in data["category_groups"]
             for category_json in category_group["categories"]
         ])
+       
+    def get_category_by_month(self, month: str, category_id: str, budget_id=LAST_USED_BUDGET_ID) -> Category:
+        return self.get(self._category_by_month_url.format(budget_id, month, category_id), lambda data: Category(data["category"]))
         
     def get_months(self, budget_id=LAST_USED_BUDGET_ID) -> List[Month]:
         return self.get(self._months_url.format(budget_id), lambda data: [
