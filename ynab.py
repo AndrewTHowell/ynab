@@ -97,6 +97,7 @@ class YNAB:
                 "[n] Net Worth",
                 "[t] Term Distribution",
                 "[r] Rollover Balance",
+                "[c] Category Normalisation",
                 "[d] Data",
                 "[e] Exit"
             ]
@@ -111,6 +112,8 @@ class YNAB:
                 case 2:
                     print(self.report_rollover())
                 case 3:
+                    print(self.report_category_normalisation())
+                case 4:
                     self.data_menu()
                 case _:
                     number_of_e = random.randrange(2, 10)
@@ -222,6 +225,31 @@ class YNAB:
         rollover = pd.DataFrame({"Rollover Balance": rollover_total}, index=[0])
         
         return format_panda(rollover)
+
+    def report_category_normalisation(self):
+        months = self.months.copy(deep=True)
+        categories = self.categories.copy(deep=True)
+        
+        # Check the last 6 months
+        months_to_check: pd.Series = months.tail(6)["month"]
+        categories_to_check = categories[
+            (categories["hidden"] == False) &
+            (categories["deleted"] == False)
+        ]["id"]
+        
+        categories_by_month = pd.DataFrame(columns=categories_to_check, index=months_to_check).transpose()
+         
+        def get_categories_by_month(category: pd.Series):
+            category_id = category.name
+            
+            return pd.Series([
+                self.client.get_category_by_month(month, category_id)
+                for month in category.index
+            ])
+        
+        categories_by_month.apply(get_categories_by_month, axis=1)
+        
+        return format_panda(categories_by_month)
 
     def report_redundant_payees(self):
         payees = self.payees.copy(deep=True)
