@@ -480,7 +480,7 @@ class Client():
         resp_resource = data_extractor(resp_data)
         
         if not self.cache is None:
-            self.cache[url] = DeltaCacheItem(resp_data["server_knowledge"], resp_resource)
+            self.cache.update_data(url, resp_data["server_knowledge"], resp_resource)
             
         return resp_resource
         
