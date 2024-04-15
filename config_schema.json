@@ -8,10 +8,16 @@
     },
     "cache_ttl": {
       "type": "integer"
+    },
+    "num_of_months_lookback": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6
     }
   },
   "required": [
     "auth_token",
-    "cache_ttl"
+    "cache_ttl",
+    "num_of_months_lookback"
   ]
 }

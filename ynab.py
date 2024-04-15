@@ -34,9 +34,11 @@ class Config():
 
         self.auth_token = config_json["auth_token"]
         self.cache_ttl = config_json["cache_ttl"]
+        self.num_of_months_lookback = config_json["num_of_months_lookback"]
         
         logging.debug(f"auth_token: {self.auth_token}")
         logging.debug(f"cache_ttl: {self.cache_ttl}")
+        logging.debug(f"num_of_months_lookback: {self.num_of_months_lookback}")
 
 
 def main():
@@ -82,15 +84,15 @@ def main():
     YNAB(config, args.cache_mode)
     
 class YNAB:
-    def __init__(self, config, cache_mode):        
+    def __init__(self, config: Config, cache_mode: api.Client.CacheMode):        
         with api.Client(auth_token=config.auth_token, cache_mode=cache_mode, cache_ttl=config.cache_ttl) as client:
             self.client = client
             
             self.load_data()
         
-            self.main_menu()
+            self.main_menu(config.num_of_months_lookback)
     
-    def main_menu(self):
+    def main_menu(self, num_of_months_lookback: int):
                 
         while True:
             options = [
@@ -112,7 +114,7 @@ class YNAB:
                 case 2:
                     print(self.report_rollover())
                 case 3:
-                    print(self.report_category_normalisation())
+                    print(self.report_category_normalisation(num_of_months_lookback))
                 case 4:
                     self.data_menu()
                 case _:
@@ -226,12 +228,12 @@ class YNAB:
         
         return format_panda(rollover)
 
-    def report_category_normalisation(self):
+    def report_category_normalisation(self, num_of_months_lookback: int):
         months = self.months.copy(deep=True)
         categories = self.categories.copy(deep=True)
         
         # Check the last 6 months
-        months_to_check: pd.Series = months.tail(6)["month"]
+        months_to_check: pd.Series = months.tail(num_of_months_lookback)["month"]
         categories_to_check = categories[
             (categories["hidden"] == False) &
             (categories["deleted"] == False)
