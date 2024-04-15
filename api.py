@@ -518,9 +518,11 @@ class Client():
         if current/max > self._rate_warn_threshold :
             logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
-    def get(self, url: str, data_extractor: Callable, resource_id: str="id"):
+    def get(self, base_url: str, url_args: List[str], data_extractor: Callable, resource_id: str="id"):
+        should_cache = not self.cache is None and base_url not in self.non_delta_cacheable_urls
+        url = base_url.format(*url_args)
+        
         params={}
-        should_cache = not self.cache is None and url not in self.non_delta_cacheable_urls
         if should_cache and url in self.cache:
             # When the cache is frozen, don't call to update the delta, just reuse what is already stored locally
             if self.cache.frozen:
@@ -546,38 +548,38 @@ class Client():
         return resp_resource
         
     def get_last_used_budget(self) -> Budget:
-        return self.get(self._budget_url.format(LAST_USED_BUDGET_ID), lambda data: Budget(data["budget"]))
+        return self.get(self._budget_url, [LAST_USED_BUDGET_ID], lambda data: Budget(data["budget"]))
 
     def get_accounts(self, budget_id=LAST_USED_BUDGET_ID) -> List[Account]:  
-        return self.get(self._accounts_url.format(budget_id), lambda data: [
+        return self.get(self._accounts_url, [budget_id], lambda data: [
             Account(account_json)
             for account_json in data["accounts"]
         ])
        
     def get_categories(self, budget_id=LAST_USED_BUDGET_ID) -> List[Category]:
-        return self.get(self._categories_url.format(budget_id), lambda data: [
+        return self.get(self._categories_url, [budget_id], lambda data: [
             Category(category_json)
             for category_group in data["category_groups"]
             for category_json in category_group["categories"]
         ])
        
     def get_category_by_month(self, month: str, category_id: str, budget_id=LAST_USED_BUDGET_ID) -> Category:
-        return self.get(self._category_by_month_url.format(budget_id, month, category_id), lambda data: Category(data["category"]))
+        return self.get(self._category_by_month_url, [budget_id, month, category_id], lambda data: Category(data["category"]))
         
     def get_months(self, budget_id=LAST_USED_BUDGET_ID) -> List[Month]:
-        return self.get(self._months_url.format(budget_id), lambda data: [
+        return self.get(self._months_url, [budget_id], lambda data: [
             Month(month_json)
             for month_json in data["months"]
         ], resource_id="month")
        
     def get_payees(self, budget_id=LAST_USED_BUDGET_ID) -> List[Payee]:
-        return self.get(self._payees_url.format(budget_id), lambda data: [
+        return self.get(self._payees_url, [budget_id], lambda data: [
             Payee(payee_json)
             for payee_json in data["payees"]
         ])
        
     def get_transactions(self, budget_id=LAST_USED_BUDGET_ID) -> List[Transaction]:
-        return self.get(self._transactions_url.format(budget_id), lambda data: [
+        return self.get(self._transactions_url, [budget_id], lambda data: [
             Transaction(transaction_json)
             for transaction_json in data["transactions"]
         ])

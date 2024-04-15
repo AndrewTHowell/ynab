@@ -250,6 +250,7 @@ class YNAB:
             ])
         
         categories_by_month.apply(get_categories_by_month, axis=1)
+        print(len(categories_by_month.index))
         
         return format_panda(categories_by_month)
 
