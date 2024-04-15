@@ -3,7 +3,7 @@ import re
 import os
 import pandas as pd
 import json
-from typing import Any, Dict, List, Protocol
+from typing import Any, Callable, Dict, List, Protocol
 from datetime import UTC, datetime, timedelta
 import jsonpickle
 from requests import auth
@@ -462,12 +462,11 @@ class Client():
         if current/max > self._rate_warn_threshold :
             logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
-    def get(self, url: str, server_knowledge=None):
-        params={}
-        if not server_knowledge is None:
-            params["last_knowledge_of_server"] = server_knowledge
+    def get(self, url: str, data_extractor: Callable):
+        params={}       
+        if not self.cache is None and url in self.cache:
+            params["last_knowledge_of_server"] = self.cache[url].server_knowledge
         
-        resp_dict = {}
         resp = self.session.get(
             urllib.parse.urljoin(self._base_url, url),
             params=params,
@@ -477,82 +476,38 @@ class Client():
         
         self.record_rate_limit(resp.headers['X-Rate-Limit'])
 
-        resp_dict = resp.json()
-        return resp_dict["data"]
-        
-    def get_last_used_budget(self) -> Budget:        
-        if not self.cache is None and "budget" in self.cache:
-            return self.cache["budget"].data
-            
-        resp_data = self.get(self._budget_url.format(LAST_USED_BUDGET_ID))
-        budget = Budget(resp_data["budget"])
+        resp_data = resp.json()["data"]
+        resp_resource = data_extractor(resp_data)
         
         if not self.cache is None:
-            self.cache["budget"] = DeltaCacheItem(resp_data["server_knowledge"], budget)
+            self.cache[url] = DeltaCacheItem(resp_data["server_knowledge"], resp_resource)
             
-        return budget
+        return resp_resource
+        
+    def get_last_used_budget(self) -> Budget:
+        return self.get(self._budget_url.format(LAST_USED_BUDGET_ID), lambda data: Budget(data["budget"]))
 
-    def get_accounts(self, budget_id=LAST_USED_BUDGET_ID) -> List[Account]:
-        server_knowledge = None
-        if not self.cache is None and "accounts" in self.cache:
-            server_knowledge = self.cache["accounts"].server_knowledge
-                   
-        resp_data = self.get(self._accounts_url.format(budget_id), server_knowledge)
-        accounts = [
+    def get_accounts(self, budget_id=LAST_USED_BUDGET_ID) -> List[Account]:  
+        return self.get(self._accounts_url.format(budget_id), lambda data: [
             Account(account_json)
-            for account_json in resp_data["accounts"]
-        ]
-        
-        if not self.cache is None:
-            self.cache.update_data("accounts", resp_data["server_knowledge"], accounts)
-            
-        return accounts
+            for account_json in data["accounts"]
+        ])
        
-    def get_categories(self, budget_id=LAST_USED_BUDGET_ID) -> List[Category]:  
-        server_knowledge = None
-        if not self.cache is None and "categories" in self.cache:
-            server_knowledge = self.cache["categories"].server_knowledge
-              
-        resp_data = self.get(self._categories_url.format(budget_id), server_knowledge)
-        categories = [
+    def get_categories(self, budget_id=LAST_USED_BUDGET_ID) -> List[Category]:
+        return self.get(self._categories_url.format(budget_id), lambda data: [
             Category(category_json)
-            for category_group in resp_data["category_groups"]
+            for category_group in data["category_groups"]
             for category_json in category_group["categories"]
-        ] 
-        
-        if not self.cache is None:
-            self.cache.update_data("categories", resp_data["server_knowledge"], categories)
-            
-        return categories
+        ])
        
-    def get_payees(self, budget_id=LAST_USED_BUDGET_ID) -> List[Payee]:  
-        server_knowledge = None
-        if not self.cache is None and "payees" in self.cache:
-            server_knowledge = self.cache["payees"].server_knowledge
-              
-        resp_data = self.get(self._payees_url.format(budget_id), server_knowledge)
-        payees = [
+    def get_payees(self, budget_id=LAST_USED_BUDGET_ID) -> List[Payee]:
+        return self.get(self._payees_url.format(budget_id), lambda data: [
             Payee(payee_json)
-            for payee_json in resp_data["payees"]
-        ] 
-        
-        if not self.cache is None:
-            self.cache.update_data("payees", resp_data["server_knowledge"], payees)
-            
-        return payees
+            for payee_json in data["payees"]
+        ])
        
-    def get_transactions(self, budget_id=LAST_USED_BUDGET_ID) -> List[Transaction]:  
-        server_knowledge = None
-        if not self.cache is None and "transactions" in self.cache:
-            server_knowledge = self.cache["transactions"].server_knowledge
-              
-        resp_data = self.get(self._transactions_url.format(budget_id), server_knowledge)
-        transactions = [
+    def get_transactions(self, budget_id=LAST_USED_BUDGET_ID) -> List[Transaction]:
+        return self.get(self._transactions_url.format(budget_id), lambda data: [
             Transaction(transaction_json)
-            for transaction_json in resp_data["transactions"]
-        ] 
-        
-        if not self.cache is None:
-            self.cache.update_data("transactions", resp_data["server_knowledge"], transactions)
-            
-        return transactions
+            for transaction_json in data["transactions"]
+        ])
