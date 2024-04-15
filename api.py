@@ -426,7 +426,7 @@ class DeltaCache(dict):
         with open(file_path, mode="w") as f:
             json.dump(encoded_cache, f)
             
-    def update_data(self, key: str, server_knowledge:int, data: List[Any], id: str ="id"):
+    def update_data(self, key: str, server_knowledge:int, data: List[Any], resource_id: str ="id"):
         cached_data = []
         if key in self:
             cached_data = self[key].data
@@ -435,7 +435,7 @@ class DeltaCache(dict):
         for cached_datum in cached_data:
             found = False
             for datum_to_cache in data_to_cache:
-                if cached_datum.__dict__[id] == datum_to_cache.__dict__[id]:
+                if cached_datum.__dict__[resource_id] == datum_to_cache.__dict__[resource_id]:
                     # Cached datum was also in the delta response
                     found = True
             
@@ -515,8 +515,8 @@ class Client():
         if current/max > self._rate_warn_threshold :
             logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
-    def get(self, url: str, data_extractor: Callable):
-        params={}
+    def get(self, url: str, data_extractor: Callable, resource_id: str="id"):
+        params={}       
         if not self.cache is None and url in self.cache:
             # When the cache is frozen, don't call to update the delta, just reuse what is already stored locally
             if self.cache.frozen:
@@ -537,7 +537,7 @@ class Client():
         resp_resource = data_extractor(resp_data)
         
         if not self.cache is None:
-            self.cache.update_data(url, resp_data["server_knowledge"], resp_resource)
+            self.cache.update_data(url, resp_data["server_knowledge"], resp_resource, resource_id=resource_id)
             
         return resp_resource
         
@@ -561,7 +561,7 @@ class Client():
         return self.get(self._months_url.format(budget_id), lambda data: [
             Month(month_json)
             for month_json in data["months"]
-        ])
+        ], resource_id="month")
        
     def get_payees(self, budget_id=LAST_USED_BUDGET_ID) -> List[Payee]:
         return self.get(self._payees_url.format(budget_id), lambda data: [
