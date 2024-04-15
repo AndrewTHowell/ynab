@@ -21,6 +21,8 @@ class Config():
     def __init__(self, file_path: str):        
         with open(file_path) as f:
             config_json = json.load(f)
+            
+            # https://api.ynab.com/v1#/Categories/getMonthCategoryById
 
             self.auth_token = config_json["auth_token"]
             self.cache_ttl = config_json["cache_ttl"]
