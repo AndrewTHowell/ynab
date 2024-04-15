@@ -91,6 +91,9 @@ class YNAB:
             self.main_menu()
     
     def main_menu(self):
+        
+        print(self.months)
+        
         while True:
             options = [
                 "[n] Net Worth",
@@ -144,11 +147,13 @@ class YNAB:
     def load_data(self):    
         accounts = self.client.get_accounts()
         categories = self.client.get_categories()
+        months = self.client.get_months()
         payees = self.client.get_payees()
         transactions = self.client.get_transactions()
         
         self.accounts = api.Account.collect_as_df(accounts)
         self.categories = api.Category.collect_as_df(categories)
+        self.months = api.Month.collect_as_df(months)
         self.payees = api.Payee.collect_as_df(payees)
         self.transactions = api.Transaction.collect_as_df(transactions)
         

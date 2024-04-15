@@ -293,6 +293,32 @@ class Category:
     def __repr__(self):
         return self.__str__()
 
+class Month:
+    def __init__(self, month_json: Dict):
+        logging.debug(f"month_json: {month_json}")
+        
+        self.month = month_json["month"]
+    
+    def as_dict(self):
+        return {"month": self.month}
+        
+    def to_df(self) -> pd.DataFrame:
+        return pd.DataFrame([self.as_dict()])
+    
+    @classmethod
+    def collect_as_df(cls, months):
+        months_df = pd.concat([ month.to_df() for month in months ], ignore_index=True)
+        return months_df.sort_values(
+            by=["month"],
+            ascending=True,
+        )
+
+    def __str__(self):
+        return self.name
+    
+    def __repr__(self):
+        return self.__str__()
+
 class Payee:
     def __init__(self, payee_json: Dict):
         #logging.debug(f"payee_json: {payee_json}")
@@ -425,6 +451,7 @@ class Client():
     _budget_url = "budgets/{}"
     _budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
+    _months_url = "budgets/{}/months"
     _payees_url = "budgets/{}/payees"
     _transactions_url = "budgets/{}/transactions"
     
@@ -528,6 +555,12 @@ class Client():
             Category(category_json)
             for category_group in data["category_groups"]
             for category_json in category_group["categories"]
+        ])
+        
+    def get_months(self, budget_id=LAST_USED_BUDGET_ID) -> List[Month]:
+        return self.get(self._months_url.format(budget_id), lambda data: [
+            Month(month_json)
+            for month_json in data["months"]
         ])
        
     def get_payees(self, budget_id=LAST_USED_BUDGET_ID) -> List[Payee]:
