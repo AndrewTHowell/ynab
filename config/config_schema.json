@@ -4,6 +4,7 @@
   "properties": {
     "auth_token": {
       "type": "string"
+  
     },
     "cache_ttl": {
       "type": "integer"
