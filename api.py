@@ -311,6 +311,10 @@ class Month:
     def get_id(self):
         return self.month
     
+    @classmethod
+    def str_format(cls):
+        return "%d-%m-%Y"
+    
     def as_dict(self):
         return {"month": self.month}
         
@@ -608,7 +612,12 @@ class Client():
         ])
        
     def get_category_by_month(self, month: str, category_id: str, budget_id=LAST_USED_BUDGET_ID) -> Category:
-        # TODO: if not current month, get cached resource
+        start_date_of_target_month = datetime.strptime(month, Month.str_format())
+        start_date_of_current_month = datetime.today().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        if start_date_of_target_month < start_date_of_current_month:
+            # Previous months are static and therefore cacheable
+            return self.get_cached_resource(self._category_by_month_url, [budget_id, month, category_id], lambda data: Category(data["category"]))
+        
         return self.get_resource(self._category_by_month_url, [budget_id, month, category_id], lambda data: Category(data["category"]))
         
     def get_months(self, budget_id=LAST_USED_BUDGET_ID) -> List[Month]:
