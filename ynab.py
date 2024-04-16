@@ -12,23 +12,23 @@ from enum import Enum
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
     
-def valid_file_path(file_path: str):
-    if not os.path.exists(file_path):
+def valid_path(path: str):
+    if not os.path.exists(path):
         raise argparse.ArgumentTypeError
-    return file_path
+    return path
 
 class Config():
-    def __init__(self, file_path: str):        
-        with open(file_path) as f:
+    def __init__(self, path: str):
+        with open(os.path.join(path, "config.json")) as f:
             config_json = json.load(f)
             
             # https://api.ynab.com/v1#/Categories/getMonthCategoryById
 
-            self.auth_token = config_json["auth_token"]
-            self.cache_ttl = config_json["cache_ttl"]
-            
-            logging.debug(f"auth_token: {self.auth_token}")
-            logging.debug(f"cache_ttl: {self.cache_ttl}")
+        self.auth_token = config_json["auth_token"]
+        self.cache_ttl = config_json["cache_ttl"]
+        
+        logging.debug(f"auth_token: {self.auth_token}")
+        logging.debug(f"cache_ttl: {self.cache_ttl}")
 
 
 def main():
@@ -37,11 +37,11 @@ def main():
         description="Script for consuming and processing YNAB data.",
     )
     parser.add_argument(
-        "-c", "--config_file_path",
-        help="The path to the configuration for this script. See schema at `config_schema.json`",
-        type=valid_file_path,
-        dest="config_file_path",
-        default="config.json"
+        "-c", "--config_path",
+        help="The path to the configuration folder for this script. Folder should contain `config.json` and `config_schema.json`",
+        type=valid_path,
+        dest="config_path",
+        default="config"
     )
     parser.add_argument(
         "-f", "--flush_cache",
@@ -66,7 +66,7 @@ def main():
         level=log_level,
     )
     
-    config = Config(args.config_file_path)
+    config = Config(args.config_path)
     
     YNAB(config, args.flush_cache)
     
