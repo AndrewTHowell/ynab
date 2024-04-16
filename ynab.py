@@ -5,6 +5,7 @@ import os
 import locale
 import api
 import pandas as pd
+import jsonschema
 from tabulate import tabulate
 from simple_term_menu import TerminalMenu
 import random
@@ -22,7 +23,10 @@ class Config():
         with open(os.path.join(path, "config.json")) as f:
             config_json = json.load(f)
             
-            # https://api.ynab.com/v1#/Categories/getMonthCategoryById
+        with open(os.path.join(path, "config_schema.json")) as f:
+            config_schema_json = json.load(f)
+            
+        jsonschema.validate(instance=config_json, schema=config_schema_json)
 
         self.auth_token = config_json["auth_token"]
         self.cache_ttl = config_json["cache_ttl"]
