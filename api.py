@@ -573,7 +573,9 @@ class Client():
     
     def get_resource(self, url_template: str, url_args: List[str], resource_extractor: Callable):
         url = url_template.format(*url_args)
-        return resource_extractor(self.get(url))
+        data = self.get(url)
+        resource = resource_extractor(data)
+        return resource
     
     def get(self, url: str, params:Dict={}):
         resp = self.session.get(
