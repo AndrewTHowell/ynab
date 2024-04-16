@@ -47,6 +47,9 @@ class Account:
         self.balance = milliunits_to_centiunits(account_json["balance"])
         self.set_term(account_json["note"])
         self.closed = account_json["closed"]
+
+    def get_id(self):
+        return self.id
         
     class Type(Enum):
         checking = "Checking"
@@ -135,7 +138,7 @@ class Account:
     def collect_as_df(cls, accounts):
         accounts_df = pd.concat([ account.to_df() for account in accounts ], ignore_index=True)
         return accounts_df.sort_values("name")
-
+    
     def __str__(self):
         return self.name
     
@@ -148,6 +151,9 @@ class Budget:
         
         self.id = budget_json["id"]
         self.name = budget_json["name"]
+
+    def get_id(self):
+        return self.id
     
     def as_dict(self):
         return {"id": self.id, "name": self.name}
@@ -176,6 +182,9 @@ class Category:
         self.set_goal_type(category_json["goal_type"])
         self.set_goal_target_month(category_json["goal_target_month"])
         self.set_term()
+
+    def get_id(self):
+        return self.id
         
     class GoalType(Enum):
         none = "None"
@@ -298,6 +307,9 @@ class Month:
         logging.debug(f"month_json: {month_json}")
         
         self.month = month_json["month"]
+
+    def get_id(self):
+        return self.month
     
     def as_dict(self):
         return {"month": self.month}
@@ -327,6 +339,9 @@ class Payee:
         self.name = payee_json["name"]
         self.transfer_account_id = payee_json["transfer_account_id"]
         self.deleted = payee_json["deleted"]
+
+    def get_id(self):
+        return self.id
     
     def as_dict(self):
         return {"id": self.id, "name": self.name, "transfer account id": self.transfer_account_id, "deleted": self.deleted}
@@ -359,6 +374,9 @@ class Transaction:
         self.payee_name = transaction_json["payee_name"]
         self.payee_id = transaction_json["payee_id"]
         self.deleted = transaction_json["deleted"]
+
+    def get_id(self):
+        return self.id
     
     def as_dict(self):
         return {
@@ -387,9 +405,11 @@ class Transaction:
 class CacheItem():
     def __init__(self, data: Any):
         self.data = data
-
-class DeltaCacheData(Protocol):
-    id: str
+    
+class DeltaCacheData(ABC):
+    @abstractmethod
+    def get_id(self) -> str:
+        pass
     
 class DeltaCacheItem():
     def __init__(self, server_knowledge: int, data: DeltaCacheData | List[DeltaCacheData]):
@@ -430,11 +450,8 @@ class Cache(dict):
         with open(file_path, mode="w") as f:
             json.dump(encoded_cache, f)
             
-    def update_delta_data(self, key: str, data: List[Any], server_knowledge: int=None, resource_id: str="id") -> List[Any]:
-        if not server_knowledge:
-            self[key] = data
-            
-        cached_data = []
+    def update_delta_data(self, key: str, data: List[DeltaCacheData], server_knowledge: int) -> List[DeltaCacheData]:            
+        cached_data: List[DeltaCacheData] = []
         if key in self:
             cached_data = self[key].data
         
@@ -442,7 +459,7 @@ class Cache(dict):
         for cached_datum in cached_data:
             found = False
             for datum_to_cache in data_to_cache:
-                if cached_datum.__dict__[resource_id] == datum_to_cache.__dict__[resource_id]:
+                if cached_datum.get_id() == datum_to_cache.get_id():
                     # Cached datum was also in the delta response
                     found = True
             
@@ -455,7 +472,7 @@ class Cache(dict):
         return data_to_cache
         
     def update_data(self, key: str, data: Any) -> None:
-        self[key] = data
+        self[key] = CacheItem(data)
 
 class Client():
     _base_url = "https://api.ynab.com/v1/"
@@ -527,7 +544,7 @@ class Client():
         if current/max > self._rate_warn_threshold :
             logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
-    def get_cached_resource(self, url_template: str, url_args: List[str], resource_extractor: Callable, resource_id: str="id"):
+    def get_cached_resource(self, url_template: str, url_args: List[str], resource_extractor: Callable):
         url = url_template.format(*url_args)
         
         params={}
@@ -548,7 +565,7 @@ class Client():
         resource = resource_extractor(data)
         
         if "server_knowledge" in data:
-            resource = self.cache.update_delta_data(url, resource, server_knowledge=data["server_knowledge"], resource_id=resource_id)
+            resource = self.cache.update_delta_data(url, resource, server_knowledge=data["server_knowledge"])
         else:
             self.cache.update_data(url, resource)
             
@@ -596,7 +613,7 @@ class Client():
         return self.get_cached_resource(self._months_url, [budget_id], lambda data: [
             Month(month_json)
             for month_json in data["months"]
-        ], resource_id="month")
+        ])
        
     def get_payees(self, budget_id=LAST_USED_BUDGET_ID) -> List[Payee]:
         return self.get_cached_resource(self._payees_url, [budget_id], lambda data: [
