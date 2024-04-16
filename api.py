@@ -20,6 +20,9 @@ _REQUEST_CACHE_EXPIRY_SECONDS = 600
 LAST_USED_BUDGET_ID="last-used"
 
 def milliunits_to_centiunits(num) -> int:
+    if not num:
+        return int(0)
+    
     centiunit = num / int(10)
     return int(centiunit)
 
