@@ -13,8 +13,8 @@ import requests_cache
 from requests import auth
 
 _CACHE_DIR_PATH = ".cache"
-_REQUEST_CACHE_FILE_NAME = "requests"
-_DELTA_CACHE_FILE = "delta.json"
+_CACHE_FILE = "cache.json"
+_REQUEST_CACHE_FILE_NAME = "requests_cache"
 _REQUEST_CACHE_EXPIRY_SECONDS = 600
 
 LAST_USED_BUDGET_ID="last-used"
@@ -383,6 +383,10 @@ class Transaction:
     
     def __repr__(self):
         return self.__str__()
+    
+class CacheItem():
+    def __init__(self, data: Any):
+        self.data = data
 
 class DeltaCacheData(Protocol):
     id: str
@@ -392,9 +396,9 @@ class DeltaCacheItem():
         self.server_knowledge = server_knowledge
         self.data = data
         
-class DeltaCache(dict):    
+class Cache(dict):
     def __init__(self, file_path: str, mode: str):
-        super(DeltaCache, self).__init__()
+        super(Cache, self).__init__()
         self._file_path = file_path
         
         self.frozen = False
@@ -426,7 +430,10 @@ class DeltaCache(dict):
         with open(file_path, mode="w") as f:
             json.dump(encoded_cache, f)
             
-    def update_data(self, key: str, server_knowledge:int, data: List[Any], resource_id: str ="id"):
+    def update_delta_data(self, key: str, data: List[Any], server_knowledge: int=None, resource_id: str="id") -> List[Any]:
+        if not server_knowledge:
+            self[key] = data
+            
         cached_data = []
         if key in self:
             cached_data = self[key].data
@@ -444,19 +451,22 @@ class DeltaCache(dict):
                 data_to_cache.append(cached_datum)
         
         self[key] = DeltaCacheItem(server_knowledge, data_to_cache)
+        
+        return data_to_cache
+        
+    def update_data(self, key: str, data: Any) -> None:
+        self[key] = data
 
 class Client():
     _base_url = "https://api.ynab.com/v1/"
     _accounts_url = "budgets/{}/accounts"
-    _budget_url = "budgets/{}"
-    _budgets_url = "budgets"
+    #_budget_url = "budgets/{}"
+    #_budgets_url = "budgets"
     _categories_url = "budgets/{}/categories"
     _category_by_month_url = "budgets/{}/months/{}/categories/{}"
     _months_url = "budgets/{}/months"
     _payees_url = "budgets/{}/payees"
     _transactions_url = "budgets/{}/transactions"
-    
-    non_delta_cacheable_urls = {_category_by_month_url}
     
     _rate_warn_threshold = 0.95
     
@@ -498,8 +508,7 @@ class Client():
             else:
                 self.session.cache.clear()
             
-        self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE), mode=cache_mode)
-        
+        self.cache = Cache(file_path=os.path.join(_CACHE_DIR_PATH, _CACHE_FILE), mode=cache_mode)
         
     def __enter__(self):
         return self
@@ -518,18 +527,38 @@ class Client():
         if current/max > self._rate_warn_threshold :
             logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
-    def get(self, base_url: str, url_args: List[str], data_extractor: Callable, resource_id: str="id"):
-        should_cache = not self.cache is None and base_url not in self.non_delta_cacheable_urls
-        url = base_url.format(*url_args)
+    def get_cached_resource(self, url_template: str, url_args: List[str], resource_extractor: Callable, resource_id: str="id"):
+        url = url_template.format(*url_args)
         
         params={}
-        if should_cache and url in self.cache:
-            # When the cache is frozen, don't call to update the delta, just reuse what is already stored locally
-            if self.cache.frozen:
-                logging.debug(f"Delta frozen, returning existing data for URL '{url}'")
-                return self.cache[url].data
-            params["last_knowledge_of_server"] = self.cache[url].server_knowledge
+        if url in self.cache:
+            match (item := self.cache[url]):
+                case CacheItem():
+                    return item.data
+                case DeltaCacheItem():
+                    # When the cache is frozen, don't call to update the delta, just reuse what is already stored locally
+                    if self.cache.frozen:
+                        logging.debug(f"Delta frozen, returning existing data for URL '{url}'")
+                        return self.cache[url].data
+                    params["last_knowledge_of_server"] = item.server_knowledge
+                case _:
+                    raise TypeError("Client cache contained unexpected item type")
         
+        data = self.get(url, params)
+        resource = resource_extractor(data)
+        
+        if "server_knowledge" in data:
+            resource = self.cache.update_delta_data(url, resource, server_knowledge=data["server_knowledge"], resource_id=resource_id)
+        else:
+            self.cache.update_data(url, resource)
+            
+        return resource
+    
+    def get_resource(self, url_template: str, url_args: List[str], resource_extractor: Callable):
+        url = url_template.format(*url_args)
+        return resource_extractor(self.get(url))
+    
+    def get(self, url: str, params:Dict={}):
         resp = self.session.get(
             urllib.parse.urljoin(self._base_url, url),
             params=params,
@@ -539,47 +568,44 @@ class Client():
         
         self.record_rate_limit(resp.headers['X-Rate-Limit'])
 
-        resp_data = resp.json()["data"]
-        resp_resource = data_extractor(resp_data)
+        return resp.json()["data"]
         
-        if should_cache:
-            self.cache.update_data(url, resp_data["server_knowledge"], resp_resource, resource_id=resource_id)
-            
-        return resp_resource
-        
+    """
     def get_last_used_budget(self) -> Budget:
         return self.get(self._budget_url, [LAST_USED_BUDGET_ID], lambda data: Budget(data["budget"]))
+    """
 
     def get_accounts(self, budget_id=LAST_USED_BUDGET_ID) -> List[Account]:  
-        return self.get(self._accounts_url, [budget_id], lambda data: [
+        return self.get_cached_resource(self._accounts_url, [budget_id], lambda data: [
             Account(account_json)
             for account_json in data["accounts"]
         ])
        
     def get_categories(self, budget_id=LAST_USED_BUDGET_ID) -> List[Category]:
-        return self.get(self._categories_url, [budget_id], lambda data: [
+        return self.get_cached_resource(self._categories_url, [budget_id], lambda data: [
             Category(category_json)
             for category_group in data["category_groups"]
             for category_json in category_group["categories"]
         ])
        
     def get_category_by_month(self, month: str, category_id: str, budget_id=LAST_USED_BUDGET_ID) -> Category:
-        return self.get(self._category_by_month_url, [budget_id, month, category_id], lambda data: Category(data["category"]))
+        # TODO: if not current month, get cached resource
+        return self.get_resource(self._category_by_month_url, [budget_id, month, category_id], lambda data: Category(data["category"]))
         
     def get_months(self, budget_id=LAST_USED_BUDGET_ID) -> List[Month]:
-        return self.get(self._months_url, [budget_id], lambda data: [
+        return self.get_cached_resource(self._months_url, [budget_id], lambda data: [
             Month(month_json)
             for month_json in data["months"]
         ], resource_id="month")
        
     def get_payees(self, budget_id=LAST_USED_BUDGET_ID) -> List[Payee]:
-        return self.get(self._payees_url, [budget_id], lambda data: [
+        return self.get_cached_resource(self._payees_url, [budget_id], lambda data: [
             Payee(payee_json)
             for payee_json in data["payees"]
         ])
        
     def get_transactions(self, budget_id=LAST_USED_BUDGET_ID) -> List[Transaction]:
-        return self.get(self._transactions_url, [budget_id], lambda data: [
+        return self.get_cached_resource(self._transactions_url, [budget_id], lambda data: [
             Transaction(transaction_json)
             for transaction_json in data["transactions"]
         ])
