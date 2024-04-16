@@ -492,6 +492,14 @@ class Client():
     _payees_url = "budgets/{}/payees"
     _transactions_url = "budgets/{}/transactions"
     
+    _delta_cacheable_urls = {
+        _accounts_url,
+        _categories_url,
+        _months_url,
+        _payees_url,
+        _transactions_url,
+    }
+    
     _rate_warn_threshold = 0.95
     
     class CacheMode(Enum): 
@@ -571,7 +579,7 @@ class Client():
         data = self.get(url, params)
         resource = resource_extractor(data)
         
-        if "server_knowledge" in data:
+        if url_template in self._delta_cacheable_urls:
             resource = self.cache.update_delta_data(url, resource, server_knowledge=data["server_knowledge"])
         else:
             self.cache.update_data(url, resource)
