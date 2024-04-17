@@ -8,6 +8,7 @@ from enum import Enum
 
 import jsonschema
 import pandas as pd
+import requests
 from simple_term_menu import TerminalMenu
 from tabulate import tabulate
 
@@ -241,9 +242,25 @@ class YNAB:
             (categories["deleted"] == False)
         ]
         
+        def get_category_by_month(month: str, category_id: str):
+            try:
+                return self.client.get_category_by_month(month, category_id)
+            except requests.HTTPError as e:
+                match e.response.status_code:
+                    case 404:
+                        """
+                        # Category not found in given month, it did not exist yet. Use shallow copy of current month
+                        current: api.Category = categories_to_check[categories_to_check["id"] == category_id]
+                        # TODO: more thorough clear of current Category needed
+                        current.activity = 0
+                        """
+                        raise e
+                    case _:
+                        raise e
+            
         data = [
             [
-                self.client.get_category_by_month(month, category_id)
+                get_category_by_month(month, category_id)
                 for month in months_to_check
             ]
             for category_id in categories_to_check["id"]
