@@ -173,7 +173,9 @@ class Category:
         
         self.id = category_json["id"]
         self.name = re.sub(r'[^\w :()]', '', category_json["name"]).lstrip(" ")
+        self.activity = milliunits_to_centiunits(category_json["activity"])
         self.balance = milliunits_to_centiunits(category_json["balance"])
+        self.budgeted = milliunits_to_centiunits(category_json["budgeted"])
         self.category_group_name = category_json["category_group_name"]
         self.hidden = category_json["hidden"]
         self.deleted = category_json["deleted"]
@@ -278,8 +280,8 @@ class Category:
     
     def as_dict(self):
         return {
-            "id": self.id, "name": self.name, "balance": self.balance, "term": self.term,
-            "category group name": self.category_group_name, "goal type": self.goal_type,
+            "id": self.id, "name": self.name, "activity": self.activity, "balance": self.balance, "budgeted": self.budgeted,
+            "term": self.term, "category group name": self.category_group_name, "goal type": self.goal_type,
             "goal target month": self.goal_target_month,"goal cadence": self.goal_cadence,
             "goal cadence frequency": self.goal_cadence_frequency, "hidden": self.hidden, "deleted": self.deleted,
         }
@@ -316,7 +318,11 @@ class Month:
     
     @classmethod
     def str_format(cls):
-        return "%d-%m-%Y"
+        return "%Y-%m-%d"
+    
+    @classmethod
+    def str_to_date(cls, month:str):
+        return  datetime.strptime(month, cls.str_format())
     
     def as_dict(self):
         return {"month": self.month}
@@ -623,7 +629,7 @@ class Client():
         ])
        
     def get_category_by_month(self, month: str, category_id: str, budget_id=LAST_USED_BUDGET_ID) -> Category:
-        start_date_of_target_month = datetime.strptime(month, Month.str_format())
+        start_date_of_target_month = Month.str_to_date(month)
         start_date_of_current_month = datetime.today().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         if start_date_of_target_month < start_date_of_current_month:
             # Previous months are static and therefore cacheable

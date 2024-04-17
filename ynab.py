@@ -232,27 +232,44 @@ class YNAB:
         months = self.months.copy(deep=True)
         categories = self.categories.copy(deep=True)
         
-        # Check the last 6 months
-        months_to_check: pd.Series = months.tail(num_of_months_lookback)["month"]
+        # Check the last N months (ignoring the last, which is next month)
+        months_to_check: pd.Series = months.sort_values(by="month", ascending=False)
+        months_to_check = months_to_check.drop(months_to_check.head(1).index).head(num_of_months_lookback)["month"]
+
         categories_to_check = categories[
             (categories["hidden"] == False) &
             (categories["deleted"] == False)
-        ]["id"]
+        ]
         
-        categories_by_month = pd.DataFrame(columns=categories_to_check, index=months_to_check).transpose()
-         
-        def get_categories_by_month(category: pd.Series):
-            category_id = category.name
-            
-            return pd.Series([
+        data = [
+            [
                 self.client.get_category_by_month(month, category_id)
-                for month in category.index
-            ])
+                for month in months_to_check
+            ]
+            for category_id in categories_to_check["id"]
+        ]
+        categories_by_month = pd.DataFrame(data=data, index=categories_to_check["name"], columns=months_to_check)
         
-        categories_by_month.apply(get_categories_by_month, axis=1)
-        print(len(categories_by_month.index))
+        def extract_spending(col: pd.Series):
+            return col.apply(lambda c: c.activity)
+
+        category_spending_by_month =  categories_by_month.apply(extract_spending)
         
-        return format_panda(categories_by_month)
+        category_spending_by_month.insert(0, "category", category_spending_by_month.index)
+        
+        print(format_panda(category_spending_by_month))
+        
+        """
+        https://medium.com/codex/simple-moving-average-and-exponentially-weighted-moving-average-with-pandas-57d4a457d363
+        
+        current_month = datetime.today().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        month_distances = months_to_check.apply(lambda m: (current_month - api.Month.str_to_date(m)).months)
+        
+        month_weights = month_distances.ewm()
+        """
+        
+        return ""
 
     def report_redundant_payees(self):
         payees = self.payees.copy(deep=True)
