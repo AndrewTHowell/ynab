@@ -167,7 +167,7 @@ class Budget:
     def __repr__(self):
         return self.__str__()
                 
-class Category:        
+class Category:
     def __init__(self, category_json: Dict):
         #logging.debug(f"category_json: {category_json}")
         

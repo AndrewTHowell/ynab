@@ -236,6 +236,7 @@ class YNAB:
         # Check the last N months (ignoring the last, which is next month)
         months_to_check: pd.Series = months.sort_values(by="month", ascending=False)
         months_to_check = months_to_check.drop(months_to_check.head(1).index).head(num_of_months_lookback)["month"]
+        current_month = months_to_check.iloc[0]
 
         categories_to_check = categories[
             (categories["hidden"] == False) &
@@ -248,13 +249,10 @@ class YNAB:
             except requests.HTTPError as e:
                 match e.response.status_code:
                     case 404:
-                        """
                         # Category not found in given month, it did not exist yet. Use shallow copy of current month
-                        current: api.Category = categories_to_check[categories_to_check["id"] == category_id]
-                        # TODO: more thorough clear of current Category needed
+                        current = get_category_by_month(current_month, category_id)
                         current.activity = 0
-                        """
-                        raise e
+                        return current
                     case _:
                         raise e
             
@@ -266,11 +264,8 @@ class YNAB:
             for category_id in categories_to_check["id"]
         ]
         categories_by_month = pd.DataFrame(data=data, index=categories_to_check["name"], columns=months_to_check)
-        
-        def extract_spending(col: pd.Series):
-            return col.apply(lambda c: c.activity)
 
-        category_spending_by_month =  categories_by_month.apply(extract_spending)
+        category_spending_by_month =  categories_by_month.apply(lambda col: col.apply(lambda category: category.activity))
         
         category_spending_by_month.insert(0, "category", category_spending_by_month.index)
         
