@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+import copy
 import json
 import logging
 import os
@@ -277,13 +280,23 @@ class Category:
             self.term = Term.medium
             
         self.term = Term.long
+        
+    def copy(self) -> Category:
+        category = copy.deepcopy(self)
+        category.activity, self.balance, self.budgeted = 0, 0, 0
+        self.goal_type = Category.GoalType.none
+        self.goal_target_month = None
+        self.goal_cadence = Category.GoalCadence.none
+        self.goal_cadence_frequency, self.goal_months_to_budget = "", 0
+        return category
     
     def as_dict(self):
         return {
             "id": self.id, "name": self.name, "activity": self.activity, "balance": self.balance, "budgeted": self.budgeted,
             "term": self.term, "category group name": self.category_group_name, "goal type": self.goal_type,
             "goal target month": self.goal_target_month,"goal cadence": self.goal_cadence,
-            "goal cadence frequency": self.goal_cadence_frequency, "hidden": self.hidden, "deleted": self.deleted,
+            "goal cadence frequency": self.goal_cadence_frequency, "goal months to budget": self.goal_months_to_budget,
+            "hidden": self.hidden, "deleted": self.deleted,
         }
         
     def to_df(self) -> pd.DataFrame:
