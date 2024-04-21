@@ -280,8 +280,8 @@ class YNAB:
         
         category_spending_by_month = categories_by_month_data.copy(deep=True)
         category_spending_by_month.insert(0, "category", category_spending_by_month.index)
-        category_spending_by_month["ewm-n"] = categories_by_month_data.apply(lambda r: r.ewm(span=num_of_months_lookback).mean().tail(1), axis=1)
-        category_spending_by_month["95%"] = categories_by_month_data.apply(lambda r: r.quantile(q=0.95), axis=1)
+        category_spending_by_month["ewm-n"] = categories_by_month_data.apply(lambda r: round(r.ewm(span=num_of_months_lookback).mean().tail(1)), axis=1)
+        category_spending_by_month["95%"] = categories_by_month_data.apply(lambda r: round(r.quantile(q=0.95)), axis=1)
         return format_panda(category_spending_by_month)
 
     def report_redundant_payees(self):
