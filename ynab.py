@@ -7,6 +7,7 @@ import random
 from enum import Enum
 
 import jsonschema
+import numpy as np
 import pandas as pd
 import requests
 from simple_term_menu import TerminalMenu
@@ -276,12 +277,19 @@ class YNAB:
         ]
         categories_by_month_data = pd.DataFrame(data=data, index=categories_to_check["name"], columns=months_to_check)
 
-        categories_by_month_data =  categories_by_month_data.apply(lambda col: col.apply(lambda category: category.activity))
+        categories_by_month_spending_data = categories_by_month_data.copy(deep=True)
+        categories_by_month_spending_data =  categories_by_month_spending_data.apply(lambda col: col.apply(lambda category: -category.activity))
+
+        categories_by_month_budgeted_data = categories_by_month_data.copy(deep=True)
+        categories_by_month_budgeted_data =  categories_by_month_budgeted_data.apply(lambda col: col.apply(lambda category: category.budgeted))
+        current_category_budgeted_data = categories_by_month_budgeted_data[current_month]
         
-        category_spending_by_month = categories_by_month_data.copy(deep=True)
+        category_spending_by_month = categories_by_month_spending_data.copy(deep=True)
         category_spending_by_month.insert(0, "category", category_spending_by_month.index)
-        category_spending_by_month["ewm-n"] = categories_by_month_data.apply(lambda r: round(r.ewm(span=num_of_months_lookback).mean().tail(1)), axis=1)
-        category_spending_by_month["95%"] = categories_by_month_data.apply(lambda r: round(r.quantile(q=0.95)), axis=1)
+        category_spending_by_month["ewm-n"] = categories_by_month_spending_data.apply(lambda r: round(r.ewm(span=num_of_months_lookback).mean().tail(1)), axis=1).astype(np.int64)
+        category_spending_by_month["95%"] = categories_by_month_spending_data.apply(lambda r: round(r.quantile(q=0.95)), axis=1).astype(np.int64)
+        category_spending_by_month = pd.concat([category_spending_by_month, current_category_budgeted_data.rename("budgeted")], axis=1)
+        
         return format_panda(category_spending_by_month)
 
     def report_redundant_payees(self):
