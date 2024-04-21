@@ -234,28 +234,39 @@ class YNAB:
         categories = self.categories.copy(deep=True)
         
         # Check the last N months (ignoring the last, which is next month)
-        months_to_check: pd.Series = months.sort_values(by="month", ascending=False)
-        months_to_check = months_to_check.drop(months_to_check.head(1).index).head(num_of_months_lookback)["month"]
-        current_month = months_to_check.iloc[0]
+        months_to_check = months.drop(months.tail(1).index).tail(num_of_months_lookback)["month"]
+        current_month = months_to_check.iloc[-1]
 
         categories_to_check = categories[
             (categories["hidden"] == False) &
             (categories["deleted"] == False)
         ]
         
+        # Circuit breaker is activated when the request limit is reached. It ensures that no more calls are sent.
+        circuit_breaker = False
+        base_month = self.client.get_category_by_month(current_month, categories_to_check["id"].iloc[0]).copy()
         def get_category_by_month(month: str, category_id: str):
+            nonlocal circuit_breaker
+            # Can't retrieve more months, return a base category to allow partial reporting
+            if circuit_breaker:
+                return base_month
+            
             try:
                 return self.client.get_category_by_month(month, category_id)
             except requests.HTTPError as e:
                 match e.response.status_code:
                     case 404:
-                        # Category not found in given month, it did not exist yet. Use shallow copy of current month
-                        current = get_category_by_month(current_month, category_id)
-                        current.activity = 0
-                        return current
+                        # Category not found in given month, it did not exist yet. Use copy of current month
+                        current = self.client.get_category_by_month(current_month, category_id)
+                        return current.copy()
+                    case 429:
+                        logging.error(f"Rate limit reached. Stopped at month {month} and category id {category_id}. Retrieved")
+                        # Can't retrieve more months, ensure no other calls are sent and return a base category to allow partial reporting
+                        circuit_breaker = True
+                        return base_month
                     case _:
                         raise e
-            
+        
         data = [
             [
                 get_category_by_month(month, category_id)
@@ -263,25 +274,15 @@ class YNAB:
             ]
             for category_id in categories_to_check["id"]
         ]
-        categories_by_month = pd.DataFrame(data=data, index=categories_to_check["name"], columns=months_to_check)
+        categories_by_month_data = pd.DataFrame(data=data, index=categories_to_check["name"], columns=months_to_check)
 
-        category_spending_by_month =  categories_by_month.apply(lambda col: col.apply(lambda category: category.activity))
+        categories_by_month_data =  categories_by_month_data.apply(lambda col: col.apply(lambda category: category.activity))
         
+        category_spending_by_month = categories_by_month_data.copy(deep=True)
         category_spending_by_month.insert(0, "category", category_spending_by_month.index)
-        
-        print(format_panda(category_spending_by_month))
-        
-        """
-        https://medium.com/codex/simple-moving-average-and-exponentially-weighted-moving-average-with-pandas-57d4a457d363
-        
-        current_month = datetime.today().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-        month_distances = months_to_check.apply(lambda m: (current_month - api.Month.str_to_date(m)).months)
-        
-        month_weights = month_distances.ewm()
-        """
-        
-        return ""
+        category_spending_by_month["ewm-n"] = categories_by_month_data.apply(lambda r: r.ewm(span=num_of_months_lookback).mean().tail(1), axis=1)
+        category_spending_by_month["95%"] = categories_by_month_data.apply(lambda r: r.quantile(q=0.95), axis=1)
+        return format_panda(category_spending_by_month)
 
     def report_redundant_payees(self):
         payees = self.payees.copy(deep=True)
