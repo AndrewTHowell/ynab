@@ -52,10 +52,13 @@ def main():
         default="config.json"
     )
     parser.add_argument(
-        "-f", "--flush_cache",
-        help="Flush the cache",
-        action='store_true',
-        dest="flush_cache",
+        "-m", "--cache_mode",
+        help="Choose a cache mode",
+        action='store',
+        type=api.Client.CacheMode.argparse,
+        choices=list(api.Client.CacheMode),
+        default=api.Client.CacheMode.normal,
+        dest="cache_mode",
     )
     parser.add_argument(
         "-d", "--debug",
@@ -76,16 +79,11 @@ def main():
     
     config = Config(args.config_file_path)
     
-    if args.flush_cache:
-        input_str = input("You've passed in `-f`, are you sure you want to flush the cache? (Y|N)")
-        if input_str != "Y":
-            exit()
-    
-    YNAB(config, args.flush_cache)
+    YNAB(config, args.cache_mode)
     
 class YNAB:
-    def __init__(self, config, flush_cache):        
-        with api.Client(auth_token=config.auth_token, cache_ttl=config.cache_ttl, flush_cache=flush_cache) as client:
+    def __init__(self, config, cache_mode):        
+        with api.Client(auth_token=config.auth_token, cache_mode=cache_mode, cache_ttl=config.cache_ttl) as client:
             self.client = client
             
             self.load_data()
