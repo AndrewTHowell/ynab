@@ -8,7 +8,7 @@ import re
 import urllib.parse
 from datetime import datetime, timedelta
 from enum import Enum
-from typing import Any, Callable, Dict, List, Protocol
+from typing import Any, Callable, Dict, List
 
 import jsonpickle
 import pandas as pd
