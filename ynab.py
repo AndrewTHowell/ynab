@@ -1,15 +1,17 @@
 import argparse
 import json
+import locale
 import logging
 import os
-import locale
-import api
-import pandas as pd
-import jsonschema
-from tabulate import tabulate
-from simple_term_menu import TerminalMenu
 import random
 from enum import Enum
+
+import jsonschema
+import pandas as pd
+from simple_term_menu import TerminalMenu
+from tabulate import tabulate
+
+import api
 
 locale.setlocale(locale.LC_ALL, 'en_GB.UTF-8')
 
@@ -73,6 +75,11 @@ def main():
     )
     
     config = Config(args.config_file_path)
+    
+    if args.flush_cache:
+        input_str = input("You've passed in `-f`, are you sure you want to flush the cache? (Y|N)")
+        if input_str != "Y":
+            exit()
     
     YNAB(config, args.flush_cache)
     

@@ -1,15 +1,16 @@
-import urllib.parse
-import re
-import os
-import pandas as pd
 import json
-from typing import Any, Callable, Dict, List, Protocol
-from datetime import UTC, datetime, timedelta
-import jsonpickle
-from requests import auth
-import requests_cache
 import logging
+import os
+import re
+import urllib.parse
+from datetime import datetime, timedelta
 from enum import Enum
+from typing import Any, Callable, Dict, List, Protocol
+
+import jsonpickle
+import pandas as pd
+import requests_cache
+from requests import auth
 
 _CACHE_DIR_PATH = ".cache"
 _REQUEST_CACHE_FILE_NAME = "requests"
