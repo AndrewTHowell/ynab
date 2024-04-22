@@ -38,7 +38,7 @@ class Term(Enum):
 
 class Account:
     def __init__(self, account_json: Dict):
-        logging.debug(f"account_json: {account_json}")
+        #logging.debug(f"account_json: {account_json}")
         
         self.id = account_json["id"]
         self.name = account_json["name"]
@@ -93,9 +93,7 @@ class Account:
                 logging.error(f"unexpected account type: {type_str}")
                 raise Exception()
         
-    def set_term(self, note: str):
-        logging.debug(f"note: {note}")
-        
+    def set_term(self, note: str):        
         def extract_term_from_note(note: str):
             if not note:
                 logging.error(f"account {self.name}: empty note")
@@ -146,7 +144,7 @@ class Account:
 
 class Budget:
     def __init__(self, budget_json: Dict):
-        logging.debug(f"budget_json: {budget_json}")
+        #logging.debug(f"budget_json: {budget_json}")
         
         self.id = budget_json["id"]
         self.name = budget_json["name"]
@@ -162,7 +160,7 @@ class Budget:
                 
 class Category:        
     def __init__(self, category_json: Dict):
-        logging.debug(f"category_json: {category_json}")
+        #logging.debug(f"category_json: {category_json}")
         
         self.id = category_json["id"]
         self.name = re.sub(r'[^\w :()]', '', category_json["name"]).lstrip(" ")
@@ -297,7 +295,7 @@ class Category:
 
 class Payee:
     def __init__(self, payee_json: Dict):
-        logging.debug(f"payee_json: {payee_json}")
+        #logging.debug(f"payee_json: {payee_json}")
         
         self.id = payee_json["id"]
         self.name = payee_json["name"]
@@ -326,7 +324,7 @@ class Payee:
 
 class Transaction:
     def __init__(self, transaction_json: Dict):
-        logging.debug(f"transaction_json: {transaction_json}")
+        #logging.debug(f"transaction_json: {transaction_json}")
         
         self.id = transaction_json["id"]
         self.date = transaction_json["date"]
