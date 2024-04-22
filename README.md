@@ -16,7 +16,7 @@ The tool expects a config json file. The schema for this config can be found in 
 For more information, see the help section:
 ```
 ❯ python ynab.py -h
-usage: ynab.py [-h] [-c CONFIG_FILE_PATH] [-f] [-d]
+usage: ynab.py [-h] [-c CONFIG_FILE_PATH] [-m {normal,freeze,flush}] [-d]
 
 Script for consuming and processing YNAB data.
 
@@ -24,7 +24,8 @@ options:
   -h, --help            show this help message and exit
   -c CONFIG_FILE_PATH, --config_file_path CONFIG_FILE_PATH
                         The path to the configuration for this script. See schema at `config_schema.json`
-  -f, --flush_cache     Flush the cache
+  -m {normal,freeze,flush}, --cache_mode {normal,freeze,flush}
+                        Choose a cache mode
   -d, --debug           Turn on debug logging
 ```
 
