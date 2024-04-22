@@ -283,7 +283,7 @@ class YNAB:
         
         category_spending_by_month = pd.DataFrame(index=categories_by_month_spending_data.index)
         category_spending_by_month["category"] = category_spending_by_month["name"]
-        category_spending_by_month["ewm-n"] = categories_by_month_spending_data.apply(lambda r: round(r.ewm(span=num_of_months_lookback).mean().tail(1)), axis=1).astype(np.int64)
+        category_spending_by_month[f"ewm({num_of_months_lookback})"] = categories_by_month_spending_data.apply(lambda r: round(r.ewm(span=num_of_months_lookback).mean().tail(1)), axis=1).astype(np.int64)
         category_spending_by_month["95%"] = categories_by_month_spending_data.apply(lambda r: round(r.quantile(q=0.95)), axis=1).astype(np.int64)
 
         # TODO: Derive this from the goal instead 
