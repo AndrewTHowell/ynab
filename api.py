@@ -366,13 +366,20 @@ class DeltaCacheItem():
         self.server_knowledge = server_knowledge
         self.data = data
         
-class DeltaCache(dict):
-    def __init__(self, file_path: str, flush_cache: bool):
+class DeltaCache(dict):    
+    def __init__(self, file_path: str, mode: str):
         super(DeltaCache, self).__init__()
         self._file_path = file_path
         
-        if not flush_cache:
-            self.load_from_file()
+        self.frozen = False
+        match mode:
+            case Client.CacheMode.freeze:
+                self.frozen = True
+            case Client.CacheMode.flush:
+                self.load_from_file()
+        
+        logging.debug(f"DeltaCache.frozen: {self.frozen}")
+                
                 
     def load_from_file(self):
         if os.path.exists(self._file_path):
@@ -423,7 +430,27 @@ class Client():
     
     _rate_warn_threshold = 0.95
     
-    def __init__(self, auth_token: str, flush_cache: bool, cache_ttl=_REQUEST_CACHE_EXPIRY_SECONDS):
+    class CacheMode(Enum): 
+        normal = 1
+        freeze = 2
+        flush = 3
+        
+        def __str__(self):
+            return self.name
+
+        def __repr__(self):
+            return str(self)
+
+        @staticmethod
+        def argparse(s):
+            try:
+                return Client.CacheMode[s]
+            except KeyError:
+                return s
+    
+    def __init__(self, auth_token: str, cache_mode: CacheMode, cache_ttl=_REQUEST_CACHE_EXPIRY_SECONDS):
+        logging.debug(f"Operating in cache mode: {cache_mode}")
+        
         self.auth = BearerAuth(auth_token)
         
         if not os.path.exists(_CACHE_DIR_PATH):
@@ -433,10 +460,15 @@ class Client():
             cache_name=os.path.join(_CACHE_DIR_PATH, _REQUEST_CACHE_FILE_NAME),
             expire_after=cache_ttl,
         )
-        if flush_cache:
-            self.clear_cache()
+        if cache_mode == Client.CacheMode.flush:
+            input_str = input(f"You've passed in the `{Client.CacheMode.flush}` cache mode, are you sure you want to flush the cache? (Y|N): ")
+            if input_str.upper() != "Y":
+                logging.fatal("Cache mode `flush` accidentally given. Rerun without this mode")
+                exit(0)
+            else:
+                self.session.cache.clear()
             
-        self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE), flush_cache=flush_cache)
+        self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE), mode=cache_mode)
         
         
     def __enter__(self):
@@ -445,11 +477,6 @@ class Client():
     def __exit__(self, *args):
         if not self.cache is None:
             self.cache.save_to_file()
- 
-    def clear_cache(self, *args):
-        self.session.cache.clear()
-
-        self.cache = DeltaCache(file_path=os.path.join(_CACHE_DIR_PATH, _DELTA_CACHE_FILE), flush_cache=True)
             
     def record_rate_limit(self, rate_limit: str):
         current, max = rate_limit.split("/")
@@ -462,8 +489,12 @@ class Client():
             logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
     def get(self, url: str, data_extractor: Callable):
-        params={}       
+        params={}
         if not self.cache is None and url in self.cache:
+            # When the cache is frozen, don't call to update the delta, just reuse what is already stored locally
+            if self.cache.frozen:
+                logging.debug(f"Delta frozen, returning existing data for URL '{url}'")
+                return self.cache[url].data
             params["last_knowledge_of_server"] = self.cache[url].server_knowledge
         
         resp = self.session.get(
