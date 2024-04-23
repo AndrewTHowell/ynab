@@ -449,11 +449,14 @@ class Cache(dict):
         self._file_path = file_path
         
         self.frozen = False
-        match mode:
-            case Client.CacheMode.freeze:
-                self.frozen = True
-            case Client.CacheMode.flush:
-                self.load_from_file()
+        if mode == Client.CacheMode.flush:
+            # Don't load from file, starting from scratch
+            return
+        
+        self.load_from_file()
+                
+        if mode == Client.CacheMode.freeze:
+            self.frozen = True
         
         logging.debug(f"DeltaCache.frozen: {self.frozen}")
                 
