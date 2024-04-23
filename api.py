@@ -323,7 +323,7 @@ class Category:
 
 class Month:
     def __init__(self, month_json: Dict):
-        logging.debug(f"month_json: {month_json}")
+        #logging.debug(f"month_json: {month_json}")
         
         self.month = month_json["month"]
 
