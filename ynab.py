@@ -116,7 +116,7 @@ class YNAB:
                 case 2:
                     print(self.report_rollover())
                 case 3:
-                    print(self.report_category_normalisation(num_of_months_lookback))
+                    print(self.report_category_stats(num_of_months_lookback))
                 case 4:
                     self.data_menu()
                 case _:
@@ -230,7 +230,7 @@ class YNAB:
         
         return format_panda(rollover)
 
-    def report_category_normalisation(self, num_of_months_lookback: int):
+    def report_category_stats(self, num_of_months_lookback: int):
         months = self.months.copy(deep=True)
         categories = self.categories.copy(deep=True)
         
