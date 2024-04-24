@@ -296,7 +296,7 @@ class YNAB:
         current_category_budgeted_data = categories_by_month_budgeted_data[current_month]
         category_spending_by_month = pd.concat([category_spending_by_month, current_category_budgeted_data.rename("budgeted")], axis=1)
         
-        category_spending_by_month = category_spending_by_month.sort_values("category", ascending=True)
+        category_spending_by_month = category_spending_by_month.sort_values("category", ascending=True, key=lambda col: col.str.lower())
         
         return format_panda(category_spending_by_month)
 
