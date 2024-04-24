@@ -270,14 +270,15 @@ class YNAB:
                     case _:
                         raise e
         
-        data = [
-            [
+        categories_by_month_data = pd.DataFrame(index=categories_to_check.index, columns=months_to_check)
+        def get_categories_by_month(row: pd.Series):
+            category_id = row.name
+            return pd.Series([
                 get_category_by_month(month, category_id)
-                for month in months_to_check
-            ]
-            for category_id in categories_to_check.index
-        ]
-        categories_by_month_data = pd.DataFrame(data=data, index=categories_to_check.index, columns=months_to_check)
+                for month in row.index
+            ], index=row.index)
+
+        categories_by_month_data = categories_by_month_data.apply(get_categories_by_month, axis=1)
 
         categories_by_month_spending_data = categories_by_month_data.copy(deep=True)
         categories_by_month_spending_data =  categories_by_month_spending_data.apply(lambda col: col.apply(lambda category: -category.activity))
