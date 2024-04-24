@@ -515,14 +515,6 @@ class Client():
     _payees_url = "budgets/{}/payees"
     _transactions_url = "budgets/{}/transactions"
     
-    _delta_cacheable_urls = {
-        _accounts_url,
-        _categories_url,
-        _months_url,
-        _payees_url,
-        _transactions_url,
-    }
-    
     _rate_warn_threshold = 0.95
     
     class CacheMode(Enum): 
@@ -582,7 +574,7 @@ class Client():
         if current/max > self._rate_warn_threshold :
             logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
-    def get_cached_resource(self, url_template: str, url_args: List[str], resource_extractor: Callable):
+    def get_resource(self, url_template: str, url_args: List[str], resource_extractor: Callable):
         url = url_template.format(*url_args)
         
         params={}
@@ -602,17 +594,11 @@ class Client():
         data = self.get(url, params)
         resource = resource_extractor(data)
         
-        if url_template in self._delta_cacheable_urls:
+        if "server_knowledge" in data:
             resource = self.cache.update_delta_data(url, resource, server_knowledge=data["server_knowledge"])
         else:
             self.cache.update_data(url, resource)
             
-        return resource
-    
-    def get_resource(self, url_template: str, url_args: List[str], resource_extractor: Callable):
-        url = url_template.format(*url_args)
-        data = self.get(url)
-        resource = resource_extractor(data)
         return resource
     
     def get(self, url: str, params:Dict={}):
@@ -626,48 +612,41 @@ class Client():
         self.record_rate_limit(resp.headers['X-Rate-Limit'])
 
         return resp.json()["data"]
-        
-    """
-    def get_last_used_budget(self) -> Budget:
-        return self.get(self._budget_url, [LAST_USED_BUDGET_ID], lambda data: Budget(data["budget"]))
-    """
 
     def get_accounts(self, budget_id=LAST_USED_BUDGET_ID) -> List[Account]:  
-        return self.get_cached_resource(self._accounts_url, [budget_id], lambda data: [
+        return self.get_resource(self._accounts_url, [budget_id], lambda data: [
             Account(account_json)
             for account_json in data["accounts"]
         ])
        
     def get_categories(self, budget_id=LAST_USED_BUDGET_ID) -> List[Category]:
-        return self.get_cached_resource(self._categories_url, [budget_id], lambda data: [
+        return self.get_resource(self._categories_url, [budget_id], lambda data: [
             Category(category_json)
             for category_group in data["category_groups"]
             for category_json in category_group["categories"]
         ])
        
     def get_category_by_month(self, month: str, category_id: str, budget_id=LAST_USED_BUDGET_ID) -> Category:
-        start_date_of_target_month = Month.str_to_date(month)
-        start_date_of_current_month = datetime.today().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        if start_date_of_target_month < start_date_of_current_month:
-            # Previous months are static and therefore cacheable
-            return self.get_cached_resource(self._category_by_month_url, [budget_id, month, category_id], lambda data: Category(data["category"]))
-        
-        return self.get_resource(self._category_by_month_url, [budget_id, month, category_id], lambda data: Category(data["category"]))
+        return self.get_resource(
+            self._category_by_month_url,
+            [budget_id, month, category_id],
+            lambda data: Category(data["category"]),
+        )
         
     def get_months(self, budget_id=LAST_USED_BUDGET_ID) -> List[Month]:
-        return self.get_cached_resource(self._months_url, [budget_id], lambda data: [
+        return self.get_resource(self._months_url, [budget_id], lambda data: [
             Month(month_json)
             for month_json in data["months"]
         ])
        
     def get_payees(self, budget_id=LAST_USED_BUDGET_ID) -> List[Payee]:
-        return self.get_cached_resource(self._payees_url, [budget_id], lambda data: [
+        return self.get_resource(self._payees_url, [budget_id], lambda data: [
             Payee(payee_json)
             for payee_json in data["payees"]
         ])
        
     def get_transactions(self, budget_id=LAST_USED_BUDGET_ID) -> List[Transaction]:
-        return self.get_cached_resource(self._transactions_url, [budget_id], lambda data: [
+        return self.get_resource(self._transactions_url, [budget_id], lambda data: [
             Transaction(transaction_json)
             for transaction_json in data["transactions"]
         ])
