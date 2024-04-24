@@ -48,6 +48,12 @@ options:
 - Rollover Balance report
   - See how much is left over in Needed For Spending Categories currently
   - It answers: when monthly rollover occurs, how much will rollover to next month given the current balances
+- Category Stats report
+  - See stats on spending per Category N months into the past
+    - Exponential Weighted Mean (EWM-N): average spending, weighting recent months more highly over older months
+    - 95%: 95th percentile of spending
+    - Budgeted: how much was budgeted this month <!--TODO: use goal to help understand how much was needed this month, not just what was budgeted-->
+  - N is configurable in the config file with `num_of_months_lookback`
 - Raw data
   - Accounts
   - Categories
