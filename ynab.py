@@ -89,13 +89,10 @@ class YNAB:
     def __init__(self, config: Config, cache_mode: api.Client.CacheMode):        
         with api.Client(auth_token=config.auth_token, cache_mode=cache_mode, cache_ttl=config.cache_ttl) as client:
             self.client = client
-            
-            self.load_data()
         
             self.main_menu(config.num_of_months_lookback)
     
     def main_menu(self, num_of_months_lookback: int):
-                
         while True:
             options = [
                 "[n] Net Worth",
@@ -130,7 +127,6 @@ class YNAB:
                 "[a] Accounts",
                 "[c] Categories",
                 "[p] Redundant Payees",
-                "[r] Refresh Data",
                 "[b] Back"
             ]
             terminal_menu = TerminalMenu(options, title="Data Menu")
@@ -143,40 +139,32 @@ class YNAB:
                     print(self.report_categories())
                 case 2:
                     print(self.report_redundant_payees())
-                case 3:
-                    self.reload_data()
                 case _:
                     break
-                
-    
-    def load_data(self):    
-        accounts = self.client.get_accounts()
-        categories = self.client.get_categories()
-        months = self.client.get_months()
-        payees = self.client.get_payees()
-        transactions = self.client.get_transactions()
-        
-        self.accounts = api.Account.collect_as_df(accounts)
-        self.categories = api.Category.collect_as_df(categories)
-        self.months = api.Month.collect_as_df(months)
-        self.payees = api.Payee.collect_as_df(payees)
-        self.transactions = api.Transaction.collect_as_df(transactions)
-        
-    def reload_data(self):
-        self.client.clear_cache()
 
-        self.load_data()
+    def get_accounts(self):
+        return api.Account.collect_as_df(self.client.get_accounts())
+
+    def get_categories(self):
+        return api.Category.collect_as_df(self.client.get_categories())
+
+    def get_months(self):
+        return api.Month.collect_as_df(self.client.get_months())
+
+    def get_payees(self):
+        return api.Payee.collect_as_df(self.client.get_payees())
+
+    def get_transactions(self):
+        return api.Transaction.collect_as_df(self.client.get_transactions())
 
     def report_accounts(self):
-        accounts = self.accounts.copy(deep=True)
-        return format_panda(accounts)
+        return format_panda(self.get_accounts())
 
     def report_categories(self):
-        categories = self.categories.copy(deep=True)
-        return format_panda(categories)
+        return format_panda(self.get_categories())
 
     def report_net_worth(self):
-        accounts = self.accounts.copy(deep=True)
+        accounts = self.get_accounts()
         
         open_accounts = accounts[accounts["closed"] == False]
         
@@ -186,8 +174,8 @@ class YNAB:
         return format_panda(net_worth)
 
     def report_term_distribution(self):
-        accounts = self.accounts.copy(deep=True)
-        categories = self.categories.copy(deep=True)
+        accounts = self.get_accounts()
+        categories = self.get_categories()
         
         open_accounts = accounts[
             (accounts["closed"] == False) &
@@ -214,7 +202,7 @@ class YNAB:
         return format_panda(term_distribution, total_row="term")
 
     def report_rollover(self):
-        categories = self.categories.copy(deep=True)
+        categories = self.get_categories()
         
         categories_that_rollover = categories[
             (categories["hidden"] == False) &
@@ -231,8 +219,8 @@ class YNAB:
         return format_panda(rollover)
 
     def report_category_stats(self, num_of_months_lookback: int):
-        months = self.months.copy(deep=True)
-        categories = self.categories.copy(deep=True)
+        months = self.get_months()
+        categories = self.get_categories()
         
         # Check the last N months (ignoring the last, which is next month)
         months_to_check = months.drop(months.tail(1).index).tail(num_of_months_lookback)["month"]
@@ -301,8 +289,8 @@ class YNAB:
         return format_panda(category_spending_by_month)
 
     def report_redundant_payees(self):
-        payees = self.payees.copy(deep=True)
-        transactions = self.transactions.copy(deep=True)
+        payees = self.get_payees()
+        transactions = self.get_transactions()
         
         payees = payees[
             (payees["deleted"] == False) &
@@ -355,7 +343,8 @@ def format_panda(df: pd.DataFrame, total_row: str="", show_index: bool=False):
         df = pd.concat([df, totals], ignore_index=True)
         
     df.columns = map(str.title, df.columns) # type: ignore
-    df.index.name = df.index.name.title()
+    if df.index.name:
+        df.index.name = df.index.name.title()
     df = format_currencies(df)
     df = format_enums(df)
     
