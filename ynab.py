@@ -286,6 +286,8 @@ class YNAB:
         category_spending_by_month["category"] = categories_to_check["name"]
         category_spending_by_month[f"ewm({num_of_months_lookback})"] = categories_by_month_spending_data.apply(lambda r: round(r.ewm(span=num_of_months_lookback).mean().tail(1)), axis=1).astype(np.int64)
         category_spending_by_month["95%"] = categories_by_month_spending_data.apply(lambda r: round(r.quantile(q=0.95)), axis=1).astype(np.int64)
+        
+        logging.debug(f"Raw data from category normalisation: \n{pd.concat([categories_by_month_spending_data, categories_to_check['name'].rename('category')], axis=1)}")
 
         # TODO: Derive this from the goal instead 
         categories_by_month_budgeted_data = categories_by_month_data.copy(deep=True)
@@ -345,17 +347,18 @@ def format_enums(df: pd.DataFrame):
 
     return df.apply(format_enum_col)
 
-def format_panda(df: pd.DataFrame, total_row: str=""):
+def format_panda(df: pd.DataFrame, total_row: str="", show_index: bool=False):
     if total_row:
         totals = pd.DataFrame([df.apply(pd.to_numeric, errors="coerce").fillna("").sum()])
         totals[total_row] = "Total"
         df = pd.concat([df, totals], ignore_index=True)
         
     df.columns = map(str.title, df.columns) # type: ignore
+    df.index.name = df.index.name.title()
     df = format_currencies(df)
     df = format_enums(df)
     
-    return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=False) # type: ignore
+    return tabulate(df, headers="keys", tablefmt="rounded_outline", showindex=show_index) # type: ignore
 
 if __name__ == "__main__":
     main()
