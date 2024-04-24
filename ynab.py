@@ -238,6 +238,7 @@ class YNAB:
         months_to_check = months.drop(months.tail(1).index).tail(num_of_months_lookback)["month"]
         current_month = months_to_check.iloc[-1]
 
+        categories = categories.set_index("id")
         categories_to_check = categories[
             (categories["goal type"].isin((api.Category.GoalType.needed_for_spending, api.Category.GoalType.target_balance_date))) &
             (categories["hidden"] == False) &
@@ -246,7 +247,7 @@ class YNAB:
         
         # Circuit breaker is activated when the request limit is reached. It ensures that no more calls are sent.
         circuit_breaker = False
-        base_month = self.client.get_category_by_month(current_month, categories_to_check["id"].iloc[0]).copy()
+        base_month = self.client.get_category_by_month(current_month, categories_to_check.index[0]).copy()
         def get_category_by_month(month: str, category_id: str):
             nonlocal circuit_breaker
             # Can't retrieve more months, return a base category to allow partial reporting
@@ -274,21 +275,17 @@ class YNAB:
                 get_category_by_month(month, category_id)
                 for month in months_to_check
             ]
-            for category_id in categories_to_check["id"]
+            for category_id in categories_to_check.index
         ]
-        categories_by_month_data = pd.DataFrame(data=data, index=categories_to_check["id"], columns=months_to_check)
+        categories_by_month_data = pd.DataFrame(data=data, index=categories_to_check.index, columns=months_to_check)
 
         categories_by_month_spending_data = categories_by_month_data.copy(deep=True)
         categories_by_month_spending_data =  categories_by_month_spending_data.apply(lambda col: col.apply(lambda category: -category.activity))
         
-        
         category_spending_by_month = pd.DataFrame(index=categories_by_month_spending_data.index)
-        print(category_spending_by_month)
-        category_spending_by_month = pd.concat([category_spending_by_month, categories_to_check["name"].rename("category")], axis=1)
+        category_spending_by_month["category"] = categories_to_check["name"]
         category_spending_by_month[f"ewm({num_of_months_lookback})"] = categories_by_month_spending_data.apply(lambda r: round(r.ewm(span=num_of_months_lookback).mean().tail(1)), axis=1).astype(np.int64)
         category_spending_by_month["95%"] = categories_by_month_spending_data.apply(lambda r: round(r.quantile(q=0.95)), axis=1).astype(np.int64)
-        
-        print(category_spending_by_month)
 
         # TODO: Derive this from the goal instead 
         categories_by_month_budgeted_data = categories_by_month_data.copy(deep=True)
