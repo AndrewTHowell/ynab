@@ -45,6 +45,9 @@ options:
   - Hence, the goal should be to align the distribution of categories in the accounts
   - Final column shows, for each term, whether or not the accounts are under/overfunded
   - **Note:** for this report to work, all your accounts must have an account note including the substring `<term> Term`
+- Rollover Balance report
+  - See how much is left over in Needed For Spending Categories currently
+  - It answers: when monthly rollover occurs, how much will rollover to next month given the current balances
 - Raw data
   - Accounts
   - Categories
