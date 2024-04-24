@@ -465,7 +465,7 @@ class Cache(dict):
         if os.path.exists(self._file_path):
             with open(self._file_path) as f:
                 encoded_cache = json.load(f)
-                logging.debug(f"encoded_cache: {encoded_cache}")
+                #logging.debug(f"encoded_cache: {encoded_cache}")
                 cache: Dict = jsonpickle.decode(str(encoded_cache)) # type: ignore
                 
                 self.clear()
@@ -476,7 +476,7 @@ class Cache(dict):
         del self._file_path
         
         encoded_cache = jsonpickle.encode(self)
-        logging.debug(f"encoded_cache: {encoded_cache}")
+        #logging.debug(f"encoded_cache: {encoded_cache}")
         with open(file_path, mode="w") as f:
             json.dump(encoded_cache, f)
             
