@@ -96,8 +96,9 @@ class YNAB:
         while True:
             options = [
                 "[n] Net Worth",
-                "[t] Term Distribution",
                 "[r] Rollover Balance",
+                "[h] Hidden Funded Categories",
+                "[t] Term Distribution",
                 "[c] Category Normalisation",
                 "[d] Data",
                 "[e] Exit"
@@ -109,12 +110,14 @@ class YNAB:
                 case 0:
                     print(self.report_net_worth())
                 case 1:
-                    print(self.report_term_distribution())
-                case 2:
                     print(self.report_rollover())
+                case 2:
+                    print(self.report_hidden_funded_categories())
                 case 3:
-                    print(self.report_category_stats(num_of_months_lookback))
+                    print(self.report_term_distribution())
                 case 4:
+                    print(self.report_category_stats(num_of_months_lookback))
+                case 5:
                     self.data_menu()
                 case _:
                     number_of_e = random.randrange(2, 10)
@@ -217,6 +220,19 @@ class YNAB:
         rollover = pd.DataFrame({"Rollover Balance": rollover_total}, index=[0])
         
         return format_panda(rollover)
+
+    def report_hidden_funded_categories(self):
+        categories = self.get_categories()
+        
+        hidden_categories_with_non_zero_balance = categories[
+            (categories["hidden"] == True) &
+            (categories["balance"] > 0)
+        ]
+        hidden_categories_with_non_zero_balance
+        hidden_categories_with_non_zero_balance = hidden_categories_with_non_zero_balance[["name", "balance"]]
+        hidden_categories_with_non_zero_balance = hidden_categories_with_non_zero_balance.sort_values("balance", ascending=False)
+        
+        return format_panda(hidden_categories_with_non_zero_balance)
 
     def report_category_stats(self, num_of_months_lookback: int):
         months = self.get_months()
