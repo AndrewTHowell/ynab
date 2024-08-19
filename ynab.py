@@ -347,6 +347,21 @@ class YNAB:
         }, index=[0])
         
         return format_panda(isa_contribution)
+
+    def report_interest(self):
+        transactions = self.get_transactions()
+        
+        interest_payments = transactions[
+            (transactions["payee name"].str.contains(pat="Interest", na=False, case=False)) &
+            (transactions["date"] > get_tax_year_start())
+        ]
+        
+        interest = pd.DataFrame({
+            "Taxable Interest": interest_payments[interest_payments["payee name"].str.contains(pat="Taxable", case=False)]["amount"].sum(),
+            "Tax-free Interest": interest_payments[interest_payments["payee name"].str.contains(pat="Tax-free", case=False)]["amount"].sum(),
+        }, index=[0])
+        
+        return format_panda(interest)
     
 def get_tax_year_start() -> datetime:
     tax_year_start = datetime(year=datetime.now().year, month=4, day=6)
