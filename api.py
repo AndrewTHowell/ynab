@@ -396,6 +396,7 @@ class Transaction:
         
         self.id = transaction_json["id"]
         self.date = datetime.strptime(transaction_json["date"], "%Y-%m-%d")
+        self.memo = transaction_json["memo"]
         self.amount = transaction_json["amount"]
         self.account_name = transaction_json["account_name"]
         self.payee_name = transaction_json["payee_name"]
@@ -407,7 +408,7 @@ class Transaction:
     
     def as_dict(self):
         return {
-            "id": self.id, "date": self.date, "amount": self.amount,
+            "id": self.id, "date": self.date, "memo": self.memo, "amount": self.amount,
             "account name": self.account_name, "payee name": self.payee_name,
             "payee id": self.payee_id, "deleted": self.deleted
         }
