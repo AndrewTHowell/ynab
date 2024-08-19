@@ -4,6 +4,7 @@ import locale
 import logging
 import os
 import random
+from datetime import datetime
 from enum import Enum
 
 import jsonschema
@@ -100,6 +101,7 @@ class YNAB:
                 "[h] Hidden Funded Categories",
                 "[t] Term Distribution",
                 "[c] Category Normalisation",
+                "[i] ISA Contributions",
                 "[d] Data",
                 "[e] Exit"
             ]
@@ -118,6 +120,8 @@ class YNAB:
                 case 4:
                     print(self.report_category_stats(num_of_months_lookback))
                 case 5:
+                    print(self.report_isa_contributions())
+                case 6:
                     self.data_menu()
                 case _:
                     number_of_e = random.randrange(2, 10)
@@ -324,6 +328,24 @@ class YNAB:
         payees = payees[["id", "name"]]
         
         return format_panda(payees)
+
+    def report_isa_contributions(self):
+        transactions = self.get_transactions()
+        
+        tax_year_start = datetime(year=datetime.now().year, month=4, day=6)
+        if tax_year_start > datetime.now():
+            tax_year_start.year -= 1
+        
+        isa_contributions = transactions[transactions["memo"].str.contains(pat="ISA Contribution", na=False, case=False)]
+        isa_contributions = isa_contributions[isa_contributions["date"] > tax_year_start]
+        isa_contribution_total = isa_contributions["amount"].sum()
+        
+        isa_contribution = pd.DataFrame({
+            "ISA Contributions": isa_contribution_total,
+            "Remaining Contribution Amount": 20_000_00-isa_contribution_total,
+        }, index=[0])
+        
+        return format_panda(isa_contribution)
         
 def format_currency(centiunit):
     unit = centiunit / 100
