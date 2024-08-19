@@ -397,7 +397,7 @@ class Transaction:
         self.id = transaction_json["id"]
         self.date = datetime.strptime(transaction_json["date"], "%Y-%m-%d")
         self.memo = transaction_json["memo"]
-        self.amount = transaction_json["amount"]
+        self.amount = milliunits_to_centiunits(transaction_json["amount"])
         self.account_name = transaction_json["account_name"]
         self.payee_name = transaction_json["payee_name"]
         self.payee_id = transaction_json["payee_id"]
