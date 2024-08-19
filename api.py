@@ -401,6 +401,7 @@ class Transaction:
         self.account_name = transaction_json["account_name"]
         self.payee_name = transaction_json["payee_name"]
         self.payee_id = transaction_json["payee_id"]
+        self.flag_name = transaction_json["flag_name"]
         self.deleted = transaction_json["deleted"]
 
     def get_id(self):
@@ -410,7 +411,7 @@ class Transaction:
         return {
             "id": self.id, "date": self.date, "memo": self.memo, "amount": self.amount,
             "account name": self.account_name, "payee name": self.payee_name,
-            "payee id": self.payee_id, "deleted": self.deleted
+            "payee id": self.payee_id, "flag name": self.flag_name, "deleted": self.deleted
         }
         
     def to_df(self) -> pd.DataFrame:
