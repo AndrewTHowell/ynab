@@ -101,7 +101,8 @@ class YNAB:
                 "[h] Hidden Funded Categories",
                 "[t] Term Distribution",
                 "[c] Category Normalisation",
-                "[i] ISA Contributions",
+                "[s] ISA Contributions",
+                "[i] Taxable Interest",
                 "[d] Data",
                 "[e] Exit"
             ]
@@ -122,6 +123,8 @@ class YNAB:
                 case 5:
                     print(self.report_isa_contributions())
                 case 6:
+                    print(self.report_interest())
+                case 7:
                     self.data_menu()
                 case _:
                     number_of_e = random.randrange(2, 10)
@@ -332,12 +335,8 @@ class YNAB:
     def report_isa_contributions(self):
         transactions = self.get_transactions()
         
-        tax_year_start = datetime(year=datetime.now().year, month=4, day=6)
-        if tax_year_start > datetime.now():
-            tax_year_start.year -= 1
-        
         isa_contributions = transactions[transactions["memo"].str.contains(pat="ISA Contribution", na=False, case=False)]
-        isa_contributions = isa_contributions[isa_contributions["date"] > tax_year_start]
+        isa_contributions = isa_contributions[isa_contributions["date"] > get_tax_year_start()]
         isa_contribution_total = isa_contributions["amount"].sum()
         
         isa_contribution = pd.DataFrame({
@@ -346,6 +345,13 @@ class YNAB:
         }, index=[0])
         
         return format_panda(isa_contribution)
+    
+def get_tax_year_start() -> datetime:
+    tax_year_start = datetime(year=datetime.now().year, month=4, day=6)
+    if tax_year_start > datetime.now():
+        tax_year_start.year -= 1
+        
+    return tax_year_start
         
 def format_currency(centiunit):
     unit = centiunit / 100
