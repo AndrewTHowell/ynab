@@ -335,8 +335,10 @@ class YNAB:
     def report_isa_contributions(self):
         transactions = self.get_transactions()
         
-        isa_contributions = transactions[transactions["memo"].str.contains(pat="ISA Contribution", na=False, case=False)]
-        isa_contributions = isa_contributions[isa_contributions["date"] > get_tax_year_start()]
+        isa_contributions = transactions[
+            (transactions["memo"].str.contains(pat="ISA Contribution", na=False, case=False)) &
+            (transactions["date"] > get_tax_year_start())
+        ]
         isa_contribution_total = isa_contributions["amount"].sum()
         
         isa_contribution = pd.DataFrame({
