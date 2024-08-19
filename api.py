@@ -395,7 +395,7 @@ class Transaction:
         #logging.debug(f"transaction_json: {transaction_json}")
         
         self.id = transaction_json["id"]
-        self.date = transaction_json["date"]
+        self.date = datetime.strptime(transaction_json["date"], "%Y-%m-%d")
         self.amount = transaction_json["amount"]
         self.account_name = transaction_json["account_name"]
         self.payee_name = transaction_json["payee_name"]
