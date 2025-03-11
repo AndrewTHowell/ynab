@@ -565,16 +565,6 @@ class Client():
     def __exit__(self, *args):
         if not self.cache is None:
             self.cache.save_to_file()
-            
-    def record_rate_limit(self, rate_limit: str):
-        current, max = rate_limit.split("/")
-        current, max = int(current), int(max)
-        
-        self.current_rate = current
-        
-        logging.debug(f"Request limit used: {current}/{max}")
-        if current/max > self._rate_warn_threshold :
-            logging.warn(f"{self._rate_warn_threshold} breached, you only have {max-current} requests remaining this hour")
     
     def get_resource(self, url_template: str, url_args: List[str], resource_extractor: Callable):
         url = url_template.format(*url_args)
@@ -610,8 +600,6 @@ class Client():
             auth=self.auth
         )
         resp.raise_for_status()
-        
-        self.record_rate_limit(resp.headers['X-Rate-Limit'])
 
         return resp.json()["data"]
 
